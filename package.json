@@ -1,0 +1,11 @@
+{
+    "name": "rossember-park-workspace",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "cd rossember-park-motor-tesserac-prueba_1 && npm run dev",
+        "build": "cd rossember-park-motor-tesserac-prueba_1 && npm run build",
+        "preview": "cd rossember-park-motor-tesserac-prueba_1 && npm run preview",
+        "install": "cd rossember-park-motor-tesserac-prueba_1 && npm install"
+    }
+}

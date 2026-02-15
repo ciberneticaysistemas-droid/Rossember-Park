@@ -1,0 +1,480 @@
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { DeviceSelector } from './components/DeviceSelector';
+import { EntryView } from './views/EntryView';
+import { ExitView } from './views/ExitView';
+import { AdminView } from './views/AdminView';
+import { AdminLogin } from './views/AdminLogin';
+import { SearchView } from './views/SearchView';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { inspectVehicle } from './services/geminiService';
+import { ParkingRecord, VehicleType, Floor } from './types';
+
+// Default Capacity Configuration
+const DEFAULT_CAPACITIES = {
+  REGULAR_CAR: 10,
+  PRIORITY_CAR: 5,
+  MOTO: 5,
+  EV_CHARGING: 5
+};
+
+const DEFAULT_PREFIXES = {
+  REGULAR_CAR: 'C',
+  PRIORITY_CAR: 'P',
+  MOTO: 'M',
+  EV_CHARGING: 'E'
+};
+
+const DEFAULT_FLOORS: Floor[] = [
+  {
+    id: 'floor-1',
+    name: 'Piso 1',
+    capacities: DEFAULT_CAPACITIES,
+    prefixes: DEFAULT_PREFIXES
+  }
+];
+
+const DEFAULT_RATES = {
+  [VehicleType.CAR]: 85,
+  [VehicleType.MOTORCYCLE]: 55,
+  [VehicleType.ELECTRIC]: 100,
+  [VehicleType.UNKNOWN]: 85,
+  'CAR_FULL': 35000,
+  'MOTO_FULL': 18000,
+  'EV_CHARGING_RATE': 120,
+  'DISABILITY_DISCOUNT_PERCENT': 50,
+  'GRACE_PERIOD_MINUTES': 15
+};
+
+// Admin credentials (in production, this should be in a secure backend)
+const ADMIN_CREDENTIALS = {
+  username: 'admin',
+  password: 'admin123'
+};
+
+const AppContent: React.FC = () => {
+  const navigate = useNavigate();
+
+  // Authentication State
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
+    return sessionStorage.getItem('adminAuth') === 'true';
+  });
+
+  // Core State
+  const [records, setRecords] = useState<ParkingRecord[]>(() => {
+    const saved = localStorage.getItem('parkingRecords');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [rates, setRates] = useState<Record<string, number>>(() => {
+    const savedRates = localStorage.getItem('parkingRates');
+    return savedRates ? JSON.parse(savedRates) : DEFAULT_RATES;
+  });
+
+  const [floors, setFloors] = useState<Floor[]>(() => {
+    const savedFloors = localStorage.getItem('parkingFloors');
+    if (savedFloors) return JSON.parse(savedFloors);
+
+    const savedCapacities = localStorage.getItem('parkingCapacities');
+    if (savedCapacities) {
+      return [{
+        id: 'floor-1',
+        name: 'Piso 1',
+        capacities: { ...DEFAULT_CAPACITIES, ...JSON.parse(savedCapacities) },
+        prefixes: DEFAULT_PREFIXES
+      }];
+    }
+
+    return DEFAULT_FLOORS;
+  });
+
+  const [advertisements, setAdvertisements] = useState<string[]>(() => {
+    const savedAds = localStorage.getItem('parkingAdvertisements');
+    return savedAds ? JSON.parse(savedAds) : [];
+  });
+
+  const [adTrigger, setAdTrigger] = useState(0);
+
+  // Client Customization State
+  const [clientLogo, setClientLogo] = useState<string | null>(() => {
+    return localStorage.getItem('clientLogo');
+  });
+
+  // Derived Total Capacities
+  const totalCapacities = floors.reduce((acc, floor) => ({
+    REGULAR_CAR: acc.REGULAR_CAR + floor.capacities.REGULAR_CAR,
+    PRIORITY_CAR: acc.PRIORITY_CAR + floor.capacities.PRIORITY_CAR,
+    MOTO: acc.MOTO + floor.capacities.MOTO,
+    EV_CHARGING: acc.EV_CHARGING + floor.capacities.EV_CHARGING
+  }), { REGULAR_CAR: 0, PRIORITY_CAR: 0, MOTO: 0, EV_CHARGING: 0 });
+
+  // Persist data
+  useEffect(() => {
+    localStorage.setItem('parkingRecords', JSON.stringify(records));
+  }, [records]);
+
+  useEffect(() => {
+    localStorage.setItem('parkingRates', JSON.stringify(rates));
+  }, [rates]);
+
+  useEffect(() => {
+    localStorage.setItem('parkingFloors', JSON.stringify(floors));
+  }, [floors]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('parkingAdvertisements', JSON.stringify(advertisements));
+    } catch (e) {
+      console.error("Failed to save advertisements to localStorage:", e);
+      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+        alert("⚠️ Memoria llena: No se pudo guardar el anuncio.");
+      }
+    }
+  }, [advertisements]);
+
+  useEffect(() => {
+    if (clientLogo) {
+      localStorage.setItem('clientLogo', clientLogo);
+    } else {
+      localStorage.removeItem('clientLogo');
+    }
+  }, [clientLogo]);
+
+  // Helper Functions
+  const getAvailableSpot = (type: VehicleType, isPriority: boolean, requiresCharging: boolean = false): { spot: string, floorId: string } | null => {
+    const activeRecords = records.filter(r => r.status === 'ACTIVE');
+    const usedSpots = new Set(activeRecords.map(r => r.spotNumber));
+
+    for (const floor of floors) {
+      const isLegacyFloor = floor.id === 'floor-1';
+      const prefixSuffix = isLegacyFloor ? '' : `${floor.name.replace(/\s/g, '')}-`;
+
+      if (requiresCharging) {
+        for (let i = 1; i <= floor.capacities.EV_CHARGING; i++) {
+          const spot = `${prefixSuffix}${floor.prefixes.EV_CHARGING}-${i.toString().padStart(3, '0')}`;
+          if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
+        }
+      } else if (type === VehicleType.MOTORCYCLE) {
+        for (let i = 1; i <= floor.capacities.MOTO; i++) {
+          const spot = `${prefixSuffix}${floor.prefixes.MOTO}-${i.toString().padStart(3, '0')}`;
+          if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
+        }
+      } else {
+        if (isPriority) {
+          for (let i = 1; i <= floor.capacities.PRIORITY_CAR; i++) {
+            const spot = `${prefixSuffix}${floor.prefixes.PRIORITY_CAR}-${i.toString().padStart(3, '0')}`;
+            if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
+          }
+        } else {
+          for (let i = 1; i <= floor.capacities.REGULAR_CAR; i++) {
+            const spot = `${prefixSuffix}${floor.prefixes.REGULAR_CAR}-${i.toString().padStart(3, '0')}`;
+            if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  const calculateCost = (entryTime: number, type: VehicleType, isDisabled?: boolean, requiresCharging?: boolean) => {
+    const exitTime = Date.now();
+    const minutes = Math.ceil((exitTime - entryTime) / 60000);
+
+    let minuteRate = requiresCharging ? rates['EV_CHARGING_RATE'] : (rates[type] || rates[VehicleType.CAR]);
+    const fullRateKey = type === VehicleType.MOTORCYCLE ? 'MOTO_FULL' : 'CAR_FULL';
+    const fullRateCap = rates[fullRateKey] || 999999;
+
+    let calculatedCost = Math.max(minutes * minuteRate, minuteRate);
+
+    if (calculatedCost > fullRateCap) {
+      calculatedCost = fullRateCap;
+    }
+
+    let totalCost = calculatedCost;
+    const originalCost = totalCost;
+
+    if (isDisabled) {
+      const discountPercent = rates['DISABILITY_DISCOUNT_PERCENT'] || 50;
+      totalCost = Math.ceil(totalCost * (1 - discountPercent / 100));
+    }
+
+    return {
+      cost: totalCost,
+      originalCost: isDisabled ? originalCost : undefined,
+      minutes,
+      exitTime
+    };
+  };
+
+  // Handlers
+  const handleProcessEntry = (
+    plate: string,
+    vehicleType: VehicleType,
+    ownerId: string,
+    imageData: string | null,
+    isAccessibility: boolean,
+    requiresCharging: boolean = false
+  ): ParkingRecord | null => {
+    const existing = records.find(r => r.plate === plate && r.status === 'ACTIVE');
+    if (existing) {
+      console.error(`Vehicle ${plate} already in parking`);
+      return null;
+    }
+
+    const assignment = getAvailableSpot(vehicleType, isAccessibility, requiresCharging);
+    if (!assignment) {
+      console.error('No available spots');
+      return null;
+    }
+
+    const newRecord: ParkingRecord = {
+      id: crypto.randomUUID(),
+      plate: plate,
+      ownerId: ownerId,
+      vehicleType: vehicleType,
+      floorId: assignment.floorId,
+      entryTime: Date.now(),
+      status: 'ACTIVE',
+      imageUrl: imageData || undefined,
+      isDisabled: isAccessibility,
+      spotNumber: assignment.spot,
+      requiresCharging: requiresCharging
+    };
+
+    setRecords(prev => [newRecord, ...prev]);
+    setAdTrigger(prev => prev + 1);
+    return newRecord;
+  };
+
+  const handleCancelEntry = (recordId: string) => {
+    setRecords(prev => prev.filter(r => r.id !== recordId));
+  };
+
+  const handleProcessPayment = (recordId: string, paymentMethod: string, email: string) => {
+    setRecords(prev => prev.map(r => {
+      if (r.id === recordId) {
+        const { cost } = calculateCost(r.entryTime, r.vehicleType, r.isDisabled, r.requiresCharging);
+        return {
+          ...r,
+          paymentStatus: 'PAID',
+          paymentMethod: paymentMethod,
+          cost: cost,
+          exitTime: Date.now()
+        };
+      }
+      return r;
+    }));
+  };
+
+  const handleRevertPayment = (recordId: string) => {
+    setRecords(prev => prev.map(r => {
+      if (r.id === recordId) {
+        return {
+          ...r,
+          paymentStatus: 'PENDING',
+          paymentMethod: undefined,
+          exitTime: undefined
+        };
+      }
+      return r;
+    }));
+  };
+
+  const handleProcessExit = (plate: string) => {
+    setRecords(prev => prev.map(r => {
+      if (r.plate === plate && r.status === 'ACTIVE') {
+        return {
+          ...r,
+          exitTime: Date.now(),
+          status: 'COMPLETED'
+        };
+      }
+      return r;
+    }));
+  };
+
+  const handleRateUpdate = (newRates: Record<string, number>) => {
+    setRates(newRates);
+  };
+
+  const handleFloorsUpdate = (newFloors: Floor[]) => {
+    setFloors(newFloors);
+  };
+
+  const handleAddAdvertisement = (ad: string) => {
+    setAdvertisements(prev => [...prev, ad]);
+  };
+
+  const handleRemoveAdvertisement = (index: number) => {
+    setAdvertisements(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleClientLogoUpdate = (logo: string | null) => {
+    setClientLogo(logo);
+  };
+
+  const handleManualExit = (id: string) => {
+    const record = records.find(r => r.id === id);
+    if (record && record.status === 'ACTIVE') {
+      const { cost, exitTime } = calculateCost(record.entryTime, record.vehicleType, record.isDisabled);
+      setRecords(prev => prev.map(r => {
+        if (r.id === id) {
+          return {
+            ...r,
+            exitTime: exitTime,
+            status: 'COMPLETED',
+            cost: cost,
+            paymentStatus: 'PAID',
+            paymentMethod: 'Manual - Admin'
+          };
+        }
+        return r;
+      }));
+      setAdTrigger(prev => prev + 1);
+    }
+  };
+
+  const handleInspection = async (id: string) => {
+    const record = records.find(r => r.id === id);
+    if (record && record.imageUrl) {
+      const details = await inspectVehicle(record.imageUrl);
+      setRecords(prev => prev.map(r => {
+        if (r.id === id) {
+          return { ...r, details };
+        }
+        return r;
+      }));
+    }
+  };
+
+  const handleAdminLogin = (username: string, password: string): boolean => {
+    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+      setIsAdminAuthenticated(true);
+      sessionStorage.setItem('adminAuth', 'true');
+      return true;
+    }
+    return false;
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdminAuthenticated(false);
+    sessionStorage.removeItem('adminAuth');
+    navigate('/');
+  };
+
+  return (
+    <Routes>
+      {/* Main Route - Search/Payment Gateway for Users */}
+      <Route path="/" element={
+        <SearchView
+          records={records}
+          capacities={totalCapacities}
+          rates={rates}
+          onProcessPayment={handleProcessPayment}
+          calculateCost={calculateCost}
+          onBackToSelector={() => navigate('/')}
+          floors={floors}
+          clientLogo={clientLogo}
+        />
+      } />
+
+      {/* Entry Route */}
+      <Route path="/entrada" element={
+        <EntryView
+          records={records}
+          capacities={totalCapacities}
+          onProcessEntry={handleProcessEntry}
+          onBackToSelector={() => navigate('/')}
+          advertisements={advertisements}
+          adTrigger={adTrigger}
+          onCancelEntry={handleCancelEntry}
+          clientLogo={clientLogo}
+        />
+      } />
+
+      {/* Exit Route */}
+      <Route path="/salida" element={
+        <ExitView
+          records={records}
+          onProcessExit={handleProcessExit}
+          calculateCost={calculateCost}
+          onBackToSelector={() => navigate('/')}
+          advertisements={advertisements}
+          adTrigger={adTrigger}
+          gracePeriod={rates['GRACE_PERIOD_MINUTES'] || 15}
+          onRevertPayment={handleRevertPayment}
+          clientLogo={clientLogo}
+        />
+      } />
+
+      {/* Search Route */}
+      <Route path="/buscar" element={
+        <SearchView
+          records={records}
+          capacities={totalCapacities}
+          rates={rates}
+          onProcessPayment={handleProcessPayment}
+          calculateCost={calculateCost}
+          onBackToSelector={() => navigate('/')}
+          floors={floors}
+          clientLogo={clientLogo}
+        />
+      } />
+
+      {/* Admin Login Route */}
+      <Route path="/admin" element={
+        isAdminAuthenticated ? (
+          <Navigate to="/admin/dashboard" replace />
+        ) : (
+          <AdminLogin onLogin={handleAdminLogin} />
+        )
+      } />
+
+      {/* Protected Admin Dashboard Route */}
+      <Route path="/admin/dashboard" element={
+        <ProtectedRoute isAuthenticated={isAdminAuthenticated}>
+          <AdminView
+            records={records}
+            rates={rates}
+            capacities={totalCapacities}
+            floors={floors}
+            advertisements={advertisements}
+            onRateUpdate={handleRateUpdate}
+            onFloorsUpdate={handleFloorsUpdate}
+            onAddAdvertisement={handleAddAdvertisement}
+            onRemoveAdvertisement={handleRemoveAdvertisement}
+            onManualExit={handleManualExit}
+            onInspection={handleInspection}
+            onBackToSelector={handleAdminLogout}
+            clientLogo={clientLogo}
+            onUpdateClientLogo={handleClientLogoUpdate}
+          />
+        </ProtectedRoute>
+      } />
+
+      {/* Hidden Device Selector Route (for internal use) */}
+      <Route path="/selector" element={
+        <DeviceSelector
+          onSelectDevice={(device) => {
+            if (device === 'ENTRY') navigate('/entrada');
+            else if (device === 'EXIT') navigate('/salida');
+            else if (device === 'SEARCH') navigate('/buscar');
+          }}
+        />
+      } />
+
+      {/* Catch all - redirect to home */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
+  );
+};
+
+export default App;
