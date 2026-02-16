@@ -209,25 +209,27 @@ export const EntryView: React.FC<EntryViewProps> = ({ records, capacities, adver
             <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <button
-                                onClick={onBackToSelector}
-                                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                            >
-                                <ArrowLeft className="w-6 h-6" />
-                            </button>
-                            <div className="flex items-center gap-3">
-                                <div className={`rounded-xl backdrop-blur-sm ${clientLogo ? 'bg-transparent p-0' : 'bg-white/20 p-3'}`}>
+                        <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-4">
+                                <div className={`flex items-center justify-center transition-all ${clientLogo ? 'bg-white/10 p-1 rounded-lg backdrop-blur-md border border-white/20 shadow-lg' : 'bg-white/20 p-3 rounded-xl'}`}>
                                     {clientLogo ? (
-                                        <img src={clientLogo} alt="Logo" className="h-20 w-auto object-contain drop-shadow-lg" />
+                                        <img src={clientLogo} alt="Logo" className="h-14 w-auto object-contain filter drop-shadow-sm" />
                                     ) : (
                                         <LogIn className="w-8 h-8" />
                                     )}
                                 </div>
-                                <div>
-                                    <h1 className="text-2xl md:text-3xl font-bold">Estación de Entrada</h1>
-                                    <p className="text-blue-100 text-sm">Registro de vehículos</p>
-                                </div>
+                                <button
+                                    onClick={onBackToSelector}
+                                    className="p-2 hover:bg-white/20 rounded-lg transition-colors group"
+                                    title="Volver"
+                                >
+                                    <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
+                                </button>
+                            </div>
+                            <div className="h-10 w-px bg-white/20 hidden md:block"></div>
+                            <div>
+                                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Estación de Entrada</h1>
+                                <p className="text-blue-100 text-sm font-medium opacity-90">Registro de vehículos</p>
                             </div>
                         </div>
                         <div className="bg-white/20 backdrop-blur-sm px-6 py-3 rounded-xl">

@@ -152,22 +152,23 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
             </div>
 
             {/* Header */}
-            <div className="relative z-10 pt-8 pb-4 px-6 md:px-12">
-                <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="flex items-center gap-4">
-                        <div className={`rounded-2xl border backdrop-blur-md ${clientLogo ? 'bg-transparent border-transparent p-0' : 'p-3 bg-white/5 border-white/10'}`}>
+            <div className="relative z-10 pt-8 pb-6 px-6 md:px-12">
+                <div className="max-w-7xl mx-auto">
+                    <div className="flex items-center gap-6">
+                        <div className={`flex items-center justify-center transition-all ${clientLogo ? 'bg-white/5 p-1 rounded-xl backdrop-blur-md border border-white/10 shadow-2xl' : 'p-4 bg-white/5 border border-white/10 rounded-2xl'}`}>
                             {clientLogo ? (
-                                <img src={clientLogo} alt="Logo" className="h-20 w-auto object-contain drop-shadow-md" />
+                                <img src={clientLogo} alt="Logo" className="h-16 w-auto object-contain drop-shadow-2xl" />
                             ) : (
                                 <Search className="w-8 h-8 text-indigo-400" />
                             )}
                         </div>
+                        <div className="h-12 w-px bg-white/10 hidden md:block"></div>
                         <div>
-                            <h1 className="text-3xl md:text-4xl font-black bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
+                            <h1 className="text-3xl md:text-4xl font-black bg-gradient-to-r from-white via-white to-white/40 bg-clip-text text-transparent tracking-tight">
                                 Pasarela de Pagos
                             </h1>
-                            <p className="text-indigo-200/60 text-sm font-medium tracking-wide">
-                                Búsqueda y gestión de pagos
+                            <p className="text-indigo-200/50 text-sm font-bold tracking-widest uppercase">
+                                Búsqueda y gestión de ingresos
                             </p>
                         </div>
                     </div>
