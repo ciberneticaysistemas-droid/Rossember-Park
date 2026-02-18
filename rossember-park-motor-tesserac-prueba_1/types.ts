@@ -53,3 +53,21 @@ export interface RecognitionResult {
   plate: string;
   confidence: number;
 }
+
+export enum SpecialRateType {
+  MONTHLY = 'Mensualidad',
+  DISCOUNT = 'Descuento',
+  EMPLOYEE = 'Empleado',
+  OTHER = 'Otro'
+}
+
+export interface SpecialRate {
+  id: string;
+  plate: string;
+  ownerId?: string; // Cédula/ID
+  type: SpecialRateType;
+  value: number; // For discount percentage (0-100) or Monthly paid value
+  description?: string;
+  expirationDate?: number; // Timestamp
+  isActive: boolean;
+}

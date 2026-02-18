@@ -5,14 +5,14 @@ import { AdDisplay } from '../components/AdDisplay';
 import { Toast } from '../components/Toast';
 import { analyzeImage } from '../services/geminiService';
 import { generateInvoice } from '../services/pdfService';
-import { ParkingRecord, VehicleType } from '../types';
+import { ParkingRecord, VehicleType, SpecialRate } from '../types';
 import { useVoice } from '../hooks/useVoice';
 import { Car, Bike, LogOut, Keyboard, Camera as CameraIcon, FileText, Activity, ArrowLeft, User, CheckCircle, ShieldAlert } from 'lucide-react';
 
 interface ExitViewProps {
     records: ParkingRecord[];
     onProcessExit: (plate: string) => void;
-    calculateCost: (entryTime: number, type: VehicleType, isDisabled?: boolean, requiresCharging?: boolean) => { cost: number; originalCost?: number; minutes: number; exitTime: number };
+    calculateCost: (entryTime: number, type: VehicleType, isDisabled?: boolean, requiresCharging?: boolean, plate?: string) => { cost: number; originalCost?: number; minutes: number; exitTime: number; specialRateLabel?: string; specialRate?: SpecialRate };
     onBackToSelector: () => void;
     advertisements: string[];
     adTrigger?: number;
@@ -57,7 +57,7 @@ export const ExitView: React.FC<ExitViewProps> = ({ records, onProcessExit, calc
     };
 
     const processExitCode = (record: ParkingRecord, currentImage?: string) => {
-        const { cost, minutes } = calculateCost(record.entryTime, record.vehicleType, record.isDisabled, record.requiresCharging);
+        const { cost, minutes } = calculateCost(record.entryTime, record.vehicleType, record.isDisabled, record.requiresCharging, record.plate);
 
         // 1. Check Grace Period Expiration (If already paid)
         if (record.paymentStatus === 'PAID' && record.exitTime) {

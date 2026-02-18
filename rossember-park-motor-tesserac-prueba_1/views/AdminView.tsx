@@ -2,12 +2,14 @@
 import { DatabaseView } from '../components/DatabaseView';
 import { RateSettingsModal } from '../components/RateSettingsModal';
 import { ParkingMapModal } from '../components/ParkingMapModal';
+import { SpecialRatesModal } from '../components/SpecialRatesModal';
 import { AdManagementModal } from '../components/AdManagementModal';
 import { PlateSearchModal } from '../components/PlateSearchModal';
 import { GracePeriodModal } from '../components/GracePeriodModal';
-import { ParkingRecord, VehicleType, Floor } from '../types';
-import { LayoutDashboard, Activity, DollarSign, Database, Settings, MapPin, ArrowLeft, TrendingUp, Car, Bike, Image as ImageIcon, Clock, Palette } from 'lucide-react';
+import { ParkingRecord, VehicleType, Floor, SpecialRate } from '../types';
+import { LayoutDashboard, Activity, DollarSign, Database, Settings, MapPin, ArrowLeft, TrendingUp, Car, Bike, Image as ImageIcon, Clock, Palette, Accessibility, Zap, Users, History, AlertTriangle, FileText, LogOut, CheckCircle, XCircle, Search, ArrowRight } from 'lucide-react';
 import { PersonalizationModal } from '../components/PersonalizationModal';
+import { ParkingLayoutMap } from '../components/ParkingLayoutMap';
 
 interface AdminViewProps {
     records: ParkingRecord[];
@@ -25,6 +27,8 @@ interface AdminViewProps {
     onFloorsUpdate?: (floors: Floor[]) => void;
     clientLogo?: string | null;
     onUpdateClientLogo?: (logo: string | null) => void;
+    specialRates: SpecialRate[];
+    onSpecialRatesUpdate: (newRates: SpecialRate[]) => void;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -42,7 +46,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
     floors,
     onFloorsUpdate,
     clientLogo,
-    onUpdateClientLogo
+    onUpdateClientLogo,
+    specialRates,
+    onSpecialRatesUpdate
 }) => {
     const [showDatabase, setShowDatabase] = useState(false);
     const [showRateSettings, setShowRateSettings] = useState(false);
@@ -51,6 +57,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const [showPlateSearch, setShowPlateSearch] = useState(false);
     const [showGracePeriod, setShowGracePeriod] = useState(false);
     const [showPersonalization, setShowPersonalization] = useState(false);
+    const [showSpecialRates, setShowSpecialRates] = useState(false);
+    const [viewMode, setViewMode] = useState<'DASHBOARD' | 'MAP'>('DASHBOARD');
 
     const activeRecords = records.filter(r => r.status === 'ACTIVE');
     const completedRecords = records.filter(r => r.status === 'COMPLETED');
@@ -115,6 +123,24 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                 </div>
                             </div>
                         </div>
+
+                        {/* View Toggle */}
+                        <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-600">
+                            <button
+                                onClick={() => setViewMode('DASHBOARD')}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'DASHBOARD' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <LayoutDashboard size={18} />
+                                Dashboard
+                            </button>
+                            <button
+                                onClick={() => setViewMode('MAP')}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'MAP' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <MapPin size={18} />
+                                Plano
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -122,89 +148,175 @@ export const AdminView: React.FC<AdminViewProps> = ({
             {/* Main Content */}
             <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
 
-                {/* Stats Grid */}
-                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    {/* Occupancy */}
-                    <div className="bg-gradient-to-br from-blue-600 to-blue-700 p-6 rounded-2xl shadow-premium text-white relative overflow-hidden group">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-white/20 transition-all"></div>
-                        <div className="flex items-center justify-between mb-4 relative z-10">
-                            <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
-                                <Activity size={24} />
+                {viewMode === 'DASHBOARD' ? (
+                    <>
+                        {/* Stats Grid */}
+                        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            {/* ... existing stats ... */}
+                            <div className="bg-gradient-to-br from-blue-600 to-blue-700 p-6 rounded-2xl shadow-premium text-white relative overflow-hidden group">
+                                <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-white/20 transition-all"></div>
+                                <div className="flex items-center justify-between mb-4 relative z-10">
+                                    <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
+                                        <Activity size={24} />
+                                    </div>
+                                    <span className="text-3xl font-bold">{occupancyPercentage}%</span>
+                                </div>
+                                <h3 className="text-sm font-semibold opacity-90 mb-1 relative z-10">Ocupación Actual</h3>
+                                <p className="text-2xl font-bold relative z-10">{activeRecords.length} / {currentTotalCapacity}</p>
+                                <div className="mt-3 flex gap-3 text-xs relative z-10">
+                                    <span className="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-lg">
+                                        <Car size={12} /> {activeCars}
+                                    </span>
+                                    <span className="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-lg">
+                                        <Bike size={12} /> {activeMotos}
+                                    </span>
+                                </div>
                             </div>
-                            <span className="text-3xl font-bold">{occupancyPercentage}%</span>
-                        </div>
-                        <h3 className="text-sm font-semibold opacity-90 mb-1 relative z-10">Ocupación Actual</h3>
-                        <p className="text-2xl font-bold relative z-10">{activeRecords.length} / {currentTotalCapacity}</p>
-                        <div className="mt-3 flex gap-3 text-xs relative z-10">
-                            <span className="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-lg">
-                                <Car size={12} /> {activeCars}
-                            </span>
-                            <span className="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-lg">
-                                <Bike size={12} /> {activeMotos}
-                            </span>
-                        </div>
-                    </div>
 
-                    {/* Today Revenue */}
-                    <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 rounded-2xl shadow-premium text-white relative overflow-hidden group">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-white/20 transition-all"></div>
-                        <div className="flex items-center justify-between mb-4 relative z-10">
-                            <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
-                                <DollarSign size={24} />
+                            {/* Today Revenue */}
+                            <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 rounded-2xl shadow-premium text-white relative overflow-hidden group">
+                                <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-white/20 transition-all"></div>
+                                <div className="flex items-center justify-between mb-4 relative z-10">
+                                    <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
+                                        <DollarSign size={24} />
+                                    </div>
+                                    <TrendingUp size={20} className="opacity-80" />
+                                </div>
+                                <h3 className="text-sm font-semibold opacity-90 mb-1 relative z-10">Ingresos Hoy</h3>
+                                <p className="text-3xl font-bold relative z-10">${todayRevenue.toLocaleString()}</p>
                             </div>
-                            <TrendingUp size={20} className="opacity-80" />
-                        </div>
-                        <h3 className="text-sm font-semibold opacity-90 mb-1 relative z-10">Ingresos Hoy</h3>
-                        <p className="text-3xl font-bold relative z-10">${todayRevenue.toLocaleString()}</p>
-                    </div>
 
-                    {/* Total Revenue */}
-                    <div className="bg-gradient-to-br from-purple-600 to-purple-700 p-6 rounded-2xl shadow-premium text-white relative overflow-hidden group">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-white/20 transition-all"></div>
-                        <div className="flex items-center justify-between mb-4 relative z-10">
-                            <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
-                                <DollarSign size={24} />
-                            </div>
-                        </div>
-                        <h3 className="text-sm font-semibold opacity-90 mb-1 relative z-10">Ingresos Totales</h3>
-                        <p className="text-3xl font-bold relative z-10">${totalRevenue.toLocaleString()}</p>
-                        <p className="text-xs opacity-80 mt-2 relative z-10 bg-black/20 inline-block px-2 py-1 rounded-lg">{completedRecords.length} transacciones</p>
-                    </div>
-
-                    {/* Total Vehicles */}
-                    <div className="bg-gradient-to-br from-orange-600 to-orange-700 p-6 rounded-2xl shadow-premium text-white relative overflow-hidden group">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-white/20 transition-all"></div>
-                        <div className="flex items-center justify-between mb-4 relative z-10">
-                            <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
-                                <Car size={24} />
-                            </div>
-                        </div>
-                        <h3 className="text-sm font-semibold opacity-90 mb-1 relative z-10">Total Vehículos</h3>
-                        <p className="text-3xl font-bold relative z-10">{records.length}</p>
-                        <p className="text-xs opacity-80 mt-2 relative z-10 bg-black/20 inline-block px-2 py-1 rounded-lg">{activeRecords.length} activos</p>
-                    </div>
-                </div>
-
-                {/* Charts Area */}
-                <div className="mb-8 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg">
-                    <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                        <TrendingUp size={20} className="text-emerald-400" />
-                        Ingresos Últimos 7 Días
-                    </h3>
-                    <div className="h-48 flex items-end gap-3 md:gap-6 justify-between px-2">
-                        {chartData.map((d, i) => (
-                            <div key={i} className="flex flex-col items-center justify-end flex-1 h-full group">
-                                <div className="w-full bg-slate-700 rounded-t-lg relative transition-all duration-500 hover:bg-emerald-600 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.5)]"
-                                    style={{ height: `${(d.revenue / maxRevenue) * 100}%`, minHeight: '4px' }}>
-                                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-slate-600 pointer-events-none z-20">
-                                        ${d.revenue.toLocaleString()}
+                            {/* Total Revenue */}
+                            <div className="bg-gradient-to-br from-purple-600 to-purple-700 p-6 rounded-2xl shadow-premium text-white relative overflow-hidden group">
+                                <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-white/20 transition-all"></div>
+                                <div className="flex items-center justify-between mb-4 relative z-10">
+                                    <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
+                                        <DollarSign size={24} />
                                     </div>
                                 </div>
-                                <span className="text-slate-400 text-xs mt-3 font-medium uppercase">{d.day}</span>
+                                <h3 className="text-sm font-semibold opacity-90 mb-1 relative z-10">Ingresos Totales</h3>
+                                <p className="text-3xl font-bold relative z-10">${totalRevenue.toLocaleString()}</p>
+                                <p className="text-xs opacity-80 mt-2 relative z-10 bg-black/20 inline-block px-2 py-1 rounded-lg">{completedRecords.length} transacciones</p>
                             </div>
-                        ))}
+
+                            {/* Total Vehicles */}
+                            <div className="bg-gradient-to-br from-orange-600 to-orange-700 p-6 rounded-2xl shadow-premium text-white relative overflow-hidden group">
+                                <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-white/20 transition-all"></div>
+                                <div className="flex items-center justify-between mb-4 relative z-10">
+                                    <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
+                                        <Car size={24} />
+                                    </div>
+                                </div>
+                                <h3 className="text-sm font-semibold opacity-90 mb-1 relative z-10">Total Vehículos</h3>
+                                <p className="text-3xl font-bold relative z-10">{records.length}</p>
+                                <p className="text-xs opacity-80 mt-2 relative z-10 bg-black/20 inline-block px-2 py-1 rounded-lg">{activeRecords.length} activos</p>
+                            </div>
+                        </div>
+
+                        {/* Charts Area */}
+                        <div className="mb-8 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg">
+                            <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                                <TrendingUp size={20} className="text-emerald-400" />
+                                Ingresos Últimos 7 Días
+                            </h3>
+                            <div className="h-48 flex items-end gap-3 md:gap-6 justify-between px-2">
+                                {chartData.map((d, i) => (
+                                    <div key={i} className="flex flex-col items-center justify-end flex-1 h-full group">
+                                        <div className="w-full bg-slate-700 rounded-t-lg relative transition-all duration-500 hover:bg-emerald-600 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.5)]"
+                                            style={{ height: `${(d.revenue / maxRevenue) * 100}%`, minHeight: '4px' }}>
+                                            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-slate-600 pointer-events-none z-20">
+                                                ${d.revenue.toLocaleString()}
+                                            </div>
+                                        </div>
+                                        <span className="text-slate-400 text-xs mt-3 font-medium uppercase">{d.day}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="mb-8 animate-fade-in">
+                        <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-8 opacity-5">
+                                <MapPin size={200} />
+                            </div>
+
+                            <div className="flex flex-col md:flex-row gap-8 relative z-10">
+                                {/* Dashboard Sidebar Aesthetic */}
+                                <div className="w-full md:w-64 space-y-4">
+                                    <h3 className="text-xl font-bold text-white mb-6">Pisos</h3>
+                                    <div className="bg-blue-600/10 border-2 border-blue-500/30 p-4 rounded-xl">
+                                        <h4 className="font-bold text-blue-400">Piso 1</h4>
+                                        <p className="text-xs text-blue-300/60 font-medium">Total: 25 cupos</p>
+                                    </div>
+                                    <div className="p-4 rounded-xl border border-slate-700 opacity-40 grayscale">
+                                        <h4 className="font-bold text-slate-400">Piso 2</h4>
+                                        <p className="text-xs text-slate-500">Próximamente</p>
+                                    </div>
+
+                                    <div className="mt-8 pt-8 border-t border-slate-700">
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="text-slate-400 uppercase font-bold tracking-widest">Resumen</span>
+                                                <span className="text-emerald-400 font-black">{records.filter(r => r.status === 'ACTIVE').length} / 25</span>
+                                            </div>
+                                            <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-emerald-500 transition-all duration-1000"
+                                                    style={{ width: `${(records.filter(r => r.status === 'ACTIVE').length / 25) * 100}%` }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex-1">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div>
+                                            <h2 className="text-3xl font-black text-white tracking-tight">Dashboard de Ocupación</h2>
+                                            <p className="text-slate-400 text-sm font-medium">Visualización en tiempo real e interactiva</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-900 rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl">
+                                        <ParkingLayoutMap records={records} interactive={true} />
+                                    </div>
+
+                                    <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                                            <div className="flex items-center gap-2 text-blue-400 mb-1">
+                                                <Accessibility size={16} />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Prioritarios</span>
+                                            </div>
+                                            <p className="text-2xl font-black text-white">{records.filter(r => r.status === 'ACTIVE' && r.spotNumber?.includes('P-')).length} / 5</p>
+                                        </div>
+                                        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                                            <div className="flex items-center gap-2 text-emerald-400 mb-1">
+                                                <Zap size={16} />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Eléctricos</span>
+                                            </div>
+                                            <p className="text-2xl font-black text-white">{records.filter(r => r.status === 'ACTIVE' && r.spotNumber?.includes('E-')).length} / 5</p>
+                                        </div>
+                                        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                                            <div className="flex items-center gap-2 text-orange-400 mb-1">
+                                                <Bike size={16} />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Motos</span>
+                                            </div>
+                                            <p className="text-2xl font-black text-white">{records.filter(r => r.status === 'ACTIVE' && r.spotNumber?.includes('M-')).length} / 4</p>
+                                        </div>
+                                        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                                            <div className="flex items-center gap-2 text-slate-400 mb-1">
+                                                <Car size={16} />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Regulares</span>
+                                            </div>
+                                            <p className="text-2xl font-black text-white">{records.filter(r => r.status === 'ACTIVE' && r.spotNumber?.includes('C-')).length} / 11</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Action Cards Grid - Reorganized */}
                 <h2 className="text-2xl font-bold text-white mb-6 pl-1">Gestión del Parqueadero</h2>
@@ -300,6 +412,20 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         <p className="text-slate-400 text-sm leading-relaxed">Configurar el logo de la empresa y opciones de marca blanca.</p>
                     </button>
 
+                    {/* 7. Tarifas Especiales */}
+                    <button
+                        onClick={() => setShowSpecialRates(true)}
+                        className="bg-slate-800 hover:bg-slate-750 p-6 rounded-2xl shadow-premium border border-slate-700 transition-all text-left group hover:border-yellow-500 hover:shadow-lg hover:shadow-yellow-900/20"
+                    >
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="bg-yellow-600 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-yellow-900/30">
+                                <Users size={24} className="text-white" />
+                            </div>
+                            <h3 className="text-xl font-bold text-white group-hover:text-yellow-400 transition-colors">Tarifas Especiales</h3>
+                        </div>
+                        <p className="text-slate-400 text-sm leading-relaxed">Gestionar mensualidades, descuentos para empleados y convenios especiales por placa.</p>
+                    </button>
+
                 </div>
 
                 {/* Recent Activity Mini Table */}
@@ -387,6 +513,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     floors={floors}
                     allowEdit={true}
                     onManualExit={onManualExit}
+                    hideMapVisual={true}
                 />
             )}
 
@@ -425,6 +552,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         setShowPersonalization(false);
                     }}
                     onClose={() => setShowPersonalization(false)}
+                />
+            )}
+
+            {showSpecialRates && (
+                <SpecialRatesModal
+                    specialRates={specialRates}
+                    onUpdate={onSpecialRatesUpdate}
+                    onClose={() => setShowSpecialRates(false)}
                 />
             )}
         </div>

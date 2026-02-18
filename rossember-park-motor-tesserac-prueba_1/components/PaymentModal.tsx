@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, CreditCard, ShieldCheck, Loader2, Smartphone, Building2, Accessibility } from 'lucide-react';
-import { VehicleType } from '../types';
+import { X, CreditCard, ShieldCheck, Loader2, Smartphone, Building2, Accessibility, MapPin } from 'lucide-react';
+import { ParkingLayoutMap } from './ParkingLayoutMap';
+import { ParkingRecord, VehicleType } from '../types';
 
 
 interface PaymentModalProps {
@@ -10,6 +11,7 @@ interface PaymentModalProps {
   cost: number;
   originalCost?: number;
   isDisabled?: boolean;
+  records?: ParkingRecord[];
   onConfirm: (bank: string, email: string) => void;
   onCancel: () => void;
 }
@@ -31,6 +33,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   cost,
   originalCost,
   isDisabled,
+  records,
   onConfirm,
   onCancel
 }) => {
@@ -111,6 +114,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <p className="text-xs text-gray-500">Tiempo</p>
                 <p className="font-medium text-gray-700">{duration}</p>
               </div>
+            </div>
+
+            {/* Map Visualization */}
+            <div className="space-y-3 p-4 bg-slate-950 rounded-2xl border border-slate-800 shadow-xl overflow-hidden relative">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                  <MapPin size={12} /> Ubicación Exacta
+                </label>
+                <div className="text-[8px] text-slate-500 font-mono">MAP_REF: {plate}</div>
+              </div>
+              <ParkingLayoutMap highlightedSpot={plate} records={records} showOnlyHighlighted={true} />
             </div>
 
             <div className="space-y-4">

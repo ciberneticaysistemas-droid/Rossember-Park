@@ -4,9 +4,10 @@ import { VehicleCard } from '../components/VehicleCard';
 import { VirtualKeyboard } from '../components/VirtualKeyboard';
 import { AdDisplay } from '../components/AdDisplay';
 import { analyzeImage } from '../services/geminiService';
-import { ParkingRecord, VehicleType } from '../types';
+import { ParkingRecord, VehicleType, SpecialRate, SpecialRateType } from '../types';
 import { useVoice } from '../hooks/useVoice';
-import { Car, Bike, LogIn, Activity, AlertCircle, User, Keyboard, Camera as CameraIcon, Accessibility, Zap, MapPin, ArrowLeft, CheckCircle, ShieldAlert } from 'lucide-react';
+import { Car, Bike, LogIn, Activity, AlertCircle, User, Keyboard, Camera as CameraIcon, Accessibility, Zap, MapPin, ArrowLeft, CheckCircle, ShieldAlert, Calendar } from 'lucide-react';
+import { ParkingLayoutMap } from '../components/ParkingLayoutMap';
 
 interface EntryViewProps {
     records: ParkingRecord[];
@@ -17,9 +18,20 @@ interface EntryViewProps {
     onBackToSelector: () => void;
     onCancelEntry: (recordId: string) => void;
     clientLogo?: string | null;
+    specialRates: SpecialRate[];
 }
 
-export const EntryView: React.FC<EntryViewProps> = ({ records, capacities, advertisements, adTrigger = 0, onProcessEntry, onBackToSelector, onCancelEntry, clientLogo }) => {
+export const EntryView: React.FC<EntryViewProps> = ({
+    records,
+    capacities,
+    advertisements,
+    adTrigger = 0,
+    onProcessEntry,
+    onBackToSelector,
+    onCancelEntry,
+    clientLogo,
+    specialRates
+}) => {
     const { speak } = useVoice();
     const [isProcessing, setIsProcessing] = useState(false);
     const [ownerIdInput, setOwnerIdInput] = useState('');
@@ -49,6 +61,7 @@ export const EntryView: React.FC<EntryViewProps> = ({ records, capacities, adver
         floorName?: string;
         requiresCharging?: boolean;
         recordId?: string;
+        specialRate?: SpecialRate;
     } | null>(null);
 
     const activeRecords = records.filter(r => r.status === 'ACTIVE');
@@ -90,6 +103,19 @@ export const EntryView: React.FC<EntryViewProps> = ({ records, capacities, adver
                     vType = VehicleType.ELECTRIC;
                 }
 
+                const specialRate = specialRates.find(r => r.plate === result.plate.toUpperCase() && r.isActive);
+                if (specialRate) {
+                    const isExpired = specialRate.expirationDate && specialRate.expirationDate < Date.now();
+                    if (isExpired) {
+                        speak(`Atención. Su mensualidad para la placa ${result.plate} ha vencido. Por favor, acuda a la administración para renovarla.`);
+                        setErrorMsg(`⚠️ La mensualidad para la placa ${result.plate} ha VENCIDO. Se le cobrará tarifa normal.`);
+                    } else {
+                        speak(`Bienvenido. Detectada ${specialRate.type} para la placa ${result.plate}.`);
+                    }
+                } else {
+                    speak("Vehículo procesado. Bienvenido.");
+                }
+
                 const resultRecord = onProcessEntry(result.plate, vType, ownerIdInput.trim(), imageData, isAccessibilityMode, requiresCharging);
 
                 if (resultRecord) {
@@ -111,7 +137,8 @@ export const EntryView: React.FC<EntryViewProps> = ({ records, capacities, adver
                         isDisabled: isAccessibilityMode,
                         spotNumber: spotStr,
                         requiresCharging: requiresCharging,
-                        recordId: resultRecord.id
+                        recordId: resultRecord.id,
+                        specialRate: specialRate || undefined
                     });
 
                     // Reset fields
@@ -171,11 +198,22 @@ export const EntryView: React.FC<EntryViewProps> = ({ records, capacities, adver
             // Adjust type if charging is required
             const finalType = (requiresCharging && manualType === VehicleType.CAR) ? VehicleType.ELECTRIC : manualType;
 
+            const specialRate = specialRates.find(r => r.plate === manualPlate.toUpperCase() && r.isActive);
             const resultRecord = onProcessEntry(manualPlate.toUpperCase(), finalType, ownerIdInput.trim(), null, isAccessibilityMode, requiresCharging);
 
             if (resultRecord) {
                 const spotStr = resultRecord.spotNumber || 'Asignado';
-                speak(`Bienvenido a Rossember Parking. Puesto asignado: ${spotStr}`);
+                if (specialRate) {
+                    const isExpired = specialRate.expirationDate && specialRate.expirationDate < Date.now();
+                    if (isExpired) {
+                        speak(`Atención. Su mensualidad para la placa ${manualPlate.toUpperCase()} ha vencido. Por favor, acuda a la administración para renovarla. Puesto asignado: ${spotStr}`);
+                        setErrorMsg(`⚠️ La mensualidad para la placa ${manualPlate.toUpperCase()} ha VENCIDO. Se le cobrará tarifa normal.`);
+                    } else {
+                        speak(`Bienvenido. Detectada ${specialRate.type} para la placa ${manualPlate.toUpperCase()}. Puesto asignado: ${spotStr}`);
+                    }
+                } else {
+                    speak(`Bienvenido a Rossember Parking. Puesto asignado: ${spotStr}`);
+                }
 
                 setLastProcessed({
                     plate: manualPlate.toUpperCase(),
@@ -186,7 +224,8 @@ export const EntryView: React.FC<EntryViewProps> = ({ records, capacities, adver
                     isDisabled: isAccessibilityMode,
                     spotNumber: spotStr,
                     requiresCharging: requiresCharging,
-                    recordId: resultRecord.id
+                    recordId: resultRecord.id,
+                    specialRate: specialRate || undefined
                 });
 
                 // Reset
@@ -441,6 +480,29 @@ export const EntryView: React.FC<EntryViewProps> = ({ records, capacities, adver
                                                     <User size={12} /> {lastProcessed.ownerId}
                                                 </span>
                                             )}
+                                            {lastProcessed.specialRate && (
+                                                <div className="w-full mt-2 p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex flex-col gap-1">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{lastProcessed.specialRate.type}</span>
+                                                        <span className="text-xs font-bold text-indigo-700">
+                                                            {lastProcessed.specialRate.type === SpecialRateType.MONTHLY
+                                                                ? `$${lastProcessed.specialRate.value.toLocaleString()}`
+                                                                : `-${lastProcessed.specialRate.value}%`}
+                                                        </span>
+                                                    </div>
+                                                    {lastProcessed.specialRate.expirationDate && (
+                                                        <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                                                            <Calendar size={12} className="text-indigo-400" />
+                                                            Vence: {new Date(lastProcessed.specialRate.expirationDate).toLocaleDateString()}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Map Visualization */}
+                                        <div className="mb-4">
+                                            <ParkingLayoutMap highlightedSpot={lastProcessed.spotNumber} isEntryAssignment records={records} />
                                         </div>
 
                                         {/* Spot Assignment */}

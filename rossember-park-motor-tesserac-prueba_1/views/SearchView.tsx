@@ -2,17 +2,17 @@ import React, { useState } from 'react';
 import { ParkingMapModal } from '../components/ParkingMapModal';
 import { PaymentModal } from '../components/PaymentModal';
 import { Toast } from '../components/Toast';
-import { ParkingRecord, VehicleType, Floor } from '../types';
+import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType } from '../types';
 import { useVoice } from '../hooks/useVoice';
 import { generateInvoice } from '../services/pdfService';
-import { Search, MapPin, Car, Bike, Clock, DollarSign, ArrowLeft, AlertCircle, CreditCard, CheckCircle, Download } from 'lucide-react';
+import { Search, MapPin, Car, Bike, Clock, DollarSign, ArrowLeft, AlertCircle, CreditCard, CheckCircle, Download, Info } from 'lucide-react';
 
 interface SearchViewProps {
     records: ParkingRecord[];
     capacities: { REGULAR_CAR: number; PRIORITY_CAR: number; MOTO: number; EV_CHARGING: number };
     rates: Record<string, number>;
     onProcessPayment: (recordId: string, paymentMethod: string, email: string) => void;
-    calculateCost: (entryTime: number, type: VehicleType, isDisabled?: boolean, requiresCharging?: boolean) => { cost: number; originalCost?: number; minutes: number; exitTime: number };
+    calculateCost: (entryTime: number, type: VehicleType, isDisabled?: boolean, requiresCharging?: boolean, plate?: string) => { cost: number; originalCost?: number; minutes: number; exitTime: number; specialRateLabel?: string; specialRate?: SpecialRate };
     onBackToSelector: () => void;
     floors?: Floor[];
     clientLogo?: string | null;
@@ -33,6 +33,8 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
         vehicleType: VehicleType;
         isDisabled?: boolean;
         durationStr: string;
+        specialRateLabel?: string;
+        specialRate?: SpecialRate;
     } | null>(null);
     const [paymentSuccess, setPaymentSuccess] = useState(false);
 
@@ -61,7 +63,7 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
         if (!searchResult) return;
         speak("Zona de pagos");
 
-        const { cost, originalCost, minutes } = calculateCost(searchResult.entryTime, searchResult.vehicleType, searchResult.isDisabled, searchResult.requiresCharging);
+        const { cost, originalCost, minutes, specialRateLabel, specialRate } = calculateCost(searchResult.entryTime, searchResult.vehicleType, searchResult.isDisabled, searchResult.requiresCharging, searchResult.plate);
         const hours = Math.floor(minutes / 60);
         const mins = minutes % 60;
         const durationStr = hours > 0 ? `${hours}h ${mins}m` : `${mins} min`;
@@ -74,7 +76,9 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
             minutes,
             vehicleType: searchResult.vehicleType,
             isDisabled: searchResult.isDisabled,
-            durationStr
+            durationStr,
+            specialRateLabel,
+            specialRate
         });
     };
 
@@ -141,7 +145,7 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
     };
 
     // Calculate current stats for display
-    const currentStats = searchResult ? calculateCost(searchResult.entryTime, searchResult.vehicleType, searchResult.isDisabled, searchResult.requiresCharging) : { cost: 0, minutes: 0 };
+    const currentStats = searchResult ? calculateCost(searchResult.entryTime, searchResult.vehicleType, searchResult.isDisabled, searchResult.requiresCharging, searchResult.plate) : { cost: 0, minutes: 0, specialRateLabel: undefined, specialRate: undefined };
 
     return (
         <div className="min-h-screen bg-[#1E1E2E] text-white selection:bg-indigo-500 selection:text-white">
@@ -287,76 +291,89 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
                                 <div className="flex flex-col md:flex-row items-center justify-between gap-8">
                                     <div className="text-center md:text-left">
                                         <p className="text-white/40 text-sm font-bold uppercase mb-2">Total a Pagar</p>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">
-                                                ${currentStats.cost.toLocaleString()}
-                                            </span>
-                                            {searchResult.status === 'ACTIVE' && searchResult.paymentStatus !== 'PAID' && (
-                                                <span className="bg-orange-500/20 text-orange-400 text-xs font-bold px-2 py-1 rounded-md border border-orange-500/20">PENDIENTE</span>
+                                        <div className="flex flex-col gap-1">
+                                            {currentStats.specialRateLabel && (
+                                                <div className="space-y-2 mb-3">
+                                                    <div className="flex items-center gap-2 text-indigo-400 font-bold text-[10px] uppercase tracking-wider bg-indigo-500/10 px-2 py-1 rounded-md border border-indigo-500/20 w-fit">
+                                                        <Info size={12} />
+                                                        {currentStats.specialRateLabel}
+                                                    </div>
+                                                    {currentStats.specialRate && (
+                                                        <div className="flex flex-col gap-1 ml-1">
+                                                            <div className="flex items-center gap-2 text-[10px] text-indigo-200/60 font-medium">
+                                                                <DollarSign size={10} className="text-emerald-400" />
+                                                                Valor Mensualidad: ${currentStats.specialRate.value.toLocaleString()}
+                                                            </div>
+                                                            {currentStats.specialRate.expirationDate && (
+                                                                <div className="flex items-center gap-2 text-[10px] text-indigo-200/60 font-medium">
+                                                                    <Clock size={10} className="text-indigo-400" />
+                                                                    Vence el: {new Date(currentStats.specialRate.expirationDate).toLocaleDateString()}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )}
-                                        </div>
-                                    </div>
-
-                                    {searchResult.paymentStatus !== 'PAID' && currentStats.cost > 0 ? (
-                                        <div className="flex flex-col gap-4 w-full md:w-auto">
-                                            {/* Security Verification Input */}
-                                            <div className="bg-[#161622] p-4 rounded-xl border border-white/10">
-                                                <label className="block text-indigo-200/60 text-xs font-bold uppercase mb-2">Confirmar No. Documento</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Ingrese Cédula del Propietario"
-                                                    className="w-full bg-[#1E1E2E] border border-[#36364A] rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-indigo-500 transition-colors text-center font-mono"
-                                                    onChange={(e) => {
-                                                        // Verify ID logic would go here - for now we just store it in a temp state or check directly
-                                                        // Since we don't have a separate state for verification, we can add one or handle it in the button click
-                                                        // But wait, I need to add state for this.
-                                                    }}
-                                                    id="verify-id-input"
-                                                />
-                                                <p className="text-[10px] text-gray-500 mt-2 text-center">
-                                                    Por seguridad, confirme el documento registrado.
-                                                </p>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">
+                                                    ${currentStats.cost.toLocaleString()}
+                                                </span>
+                                                {searchResult.status === 'ACTIVE' && searchResult.paymentStatus !== 'PAID' && (
+                                                    <span className="bg-orange-500/20 text-orange-400 text-xs font-bold px-2 py-1 rounded-md border border-orange-500/20">PENDIENTE</span>
+                                                )}
                                             </div>
+                                        </div>
 
-                                            <button
-                                                onClick={() => {
-                                                    const input = document.getElementById('verify-id-input') as HTMLInputElement;
-                                                    const val = input.value.trim();
-                                                    // Check if ownerId exists and matches
-                                                    if (!searchResult.ownerId) {
-                                                        alert("Error: Este vehículo no tiene un documento asociado para verificar. Contacte al administrador.");
-                                                        return;
-                                                    }
-                                                    if (val === searchResult.ownerId) {
-                                                        handleInitiatePayment();
-                                                    } else {
-                                                        speak("Documento incorrecto.");
-                                                        alert("El número de documento no coincide con el registrado de ingreso.");
-                                                    }
-                                                }}
-                                                className="w-full px-10 py-5 bg-white text-indigo-900 hover:bg-indigo-50 rounded-2xl font-black text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-3"
-                                            >
-                                                <CreditCard size={24} />
-                                                VERIFICAR Y PAGAR
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="px-8 py-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 font-bold flex items-center gap-3">
-                                            <CheckCircle size={24} />
-                                            {currentStats.cost === 0 ? "GRATIS / PERIODO DE GRACIA" : "PAGADO"}
-                                        </div>
-                                    )}
+                                        {searchResult.paymentStatus !== 'PAID' && currentStats.cost > 0 ? (
+                                            <div className="flex flex-col gap-4 w-full md:w-auto mt-4">
+                                                <div className="bg-[#161622] p-4 rounded-xl border border-white/10">
+                                                    <label className="block text-indigo-200/60 text-xs font-bold uppercase mb-2">Confirmar No. Documento</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Ingrese Cédula del Propietario"
+                                                        className="w-full bg-[#1E1E2E] border border-[#36364A] rounded-lg px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-indigo-500 transition-colors text-center font-mono"
+                                                        id="verify-id-input"
+                                                    />
+                                                </div>
+
+                                                <button
+                                                    onClick={() => {
+                                                        const input = document.getElementById('verify-id-input') as HTMLInputElement;
+                                                        const val = input.value.trim();
+                                                        if (!searchResult.ownerId) {
+                                                            alert("Error: Este vehículo no tiene un documento asociado para verificar. Contacte al administrador.");
+                                                            return;
+                                                        }
+                                                        if (val === searchResult.ownerId) {
+                                                            handleInitiatePayment();
+                                                        } else {
+                                                            speak("Documento incorrecto.");
+                                                            alert("El número de documento no coincide con el registrado de ingreso.");
+                                                        }
+                                                    }}
+                                                    className="w-full px-10 py-5 bg-white text-indigo-900 hover:bg-indigo-50 rounded-2xl font-black text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-3"
+                                                >
+                                                    <CreditCard size={24} />
+                                                    VERIFICAR Y PAGAR
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-4 px-8 py-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 font-bold flex items-center gap-3">
+                                                <CheckCircle size={24} />
+                                                {currentStats.cost === 0 ? "GRATIS / PERIODO DE GRACIA" : "PAGADO"}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
+
+                                {/* Map Action */}
+                                <button
+                                    onClick={() => setShowMap(true)}
+                                    className="mt-6 w-full py-4 text-indigo-300 hover:text-white font-medium text-sm transition-colors flex items-center justify-center gap-2 group"
+                                >
+                                    <MapPin size={16} className="group-hover:scale-110 transition-transform" /> Ver ubicación exacta en el mapa
+                                </button>
                             </div>
-
-                            {/* Map Action */}
-                            <button
-                                onClick={() => setShowMap(true)}
-                                className="mt-6 w-full py-4 text-indigo-300 hover:text-white font-medium text-sm transition-colors flex items-center justify-center gap-2 group"
-                            >
-                                <MapPin size={16} className="group-hover:scale-110 transition-transform" /> Ver ubicación exacta en el mapa
-                            </button>
-
                         </div>
                     </div>
                 )}
@@ -370,7 +387,6 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
                         <p className="text-sm text-indigo-100">Pagos seguros con PSE y Tarjetas</p>
                     </div>
                 )}
-
             </div>
 
             {/* Modals and Toasts */}
@@ -402,6 +418,7 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
                     cost={pendingPayment.cost}
                     originalCost={pendingPayment.originalCost}
                     isDisabled={pendingPayment.isDisabled}
+                    records={records}
                     onConfirm={handlePaymentConfirm}
                     onCancel={() => setPendingPayment(null)}
                 />

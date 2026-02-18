@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, LayoutGrid, Car, Bike, Accessibility, Zap, LogOut, Plus, Trash2, Edit2 } from 'lucide-react';
+import { X, LayoutGrid, Car, Bike, Accessibility, Zap, LogOut, Plus, Trash2, Edit2, MapPin } from 'lucide-react';
+import { ParkingLayoutMap } from './ParkingLayoutMap';
 import { ParkingRecord, Floor } from '../types';
 
 interface ParkingMapModalProps {
@@ -18,6 +19,7 @@ interface ParkingMapModalProps {
   allowEdit?: boolean;
   onManualExit?: (id: string) => void;
   isPublicView?: boolean;
+  hideMapVisual?: boolean;
 }
 
 export const ParkingMapModal: React.FC<ParkingMapModalProps> = ({
@@ -30,7 +32,8 @@ export const ParkingMapModal: React.FC<ParkingMapModalProps> = ({
   onFloorsUpdate,
   allowEdit = false,
   onManualExit,
-  isPublicView = false
+  isPublicView = false,
+  hideMapVisual = false
 }) => {
   // If floors are not provided (legacy), create a dummy floor wrapper around capacities
   const effectiveFloors = floors.length > 0 ? floors : [{
@@ -357,220 +360,106 @@ export const ParkingMapModal: React.FC<ParkingMapModalProps> = ({
           </div>
 
           {/* Grid Area */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#1E1E2E] space-y-8">
 
-            {/* Legend */}
-            <div className="flex flex-wrap gap-4 mb-8 bg-white p-3 rounded-xl border border-gray-200 shadow-sm justify-center">
-              <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
-                <div className="w-4 h-4 bg-gray-100 border border-gray-200 rounded"></div> Libre
-              </div>
-              <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
-                <div className="w-4 h-4 bg-red-500 rounded"></div> Ocupado (Carro)
-              </div>
-              <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
-                <div className="w-4 h-4 bg-blue-600 rounded"></div> Prioridad
-              </div>
-              <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
-                <div className="w-4 h-4 bg-green-500 rounded"></div> Eléctrico
-              </div>
-              <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
-                <div className="w-4 h-4 bg-orange-500 rounded"></div> Moto
-              </div>
-            </div>
+            {!hideMapVisual ? (
+              <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-5">
+                  <MapPin size={200} />
+                </div>
 
-            {currentFloor && (
-              <div className="flex flex-col gap-6">
-
-                {/* Left Col: Priority, Moto, EV */}
-                <div className="space-y-6">
-
-                  {/* Priority Section */}
-                  <div className="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm">
-                    <div className="flex items-center justify-between mb-4 border-b border-blue-50 pb-2">
-                      <h4 className="flex items-center gap-2 font-bold text-blue-800">
-                        <Accessibility size={20} /> Zona Prioritaria
-                      </h4>
-                      <div className="flex items-center gap-2">
-                        {allowEdit && (
-                          <div className="flex items-center gap-3">
-                            <div className="flex flex-col items-center">
-                              <span className="text-[10px] text-gray-400 uppercase font-bold">Prefijo</span>
-                              <input
-                                type="text"
-                                value={currentFloor.prefixes?.PRIORITY_CAR ?? ''}
-                                onChange={(e) => handlePrefixChange('PRIORITY_CAR', e.target.value)}
-                                className="w-10 h-6 border rounded text-xs text-center font-bold text-blue-600 focus:ring-1 focus:ring-blue-400 outline-none"
-                                maxLength={3}
-                              />
-                            </div>
-                            <div className="w-[1px] h-8 bg-gray-100 mx-1"></div>
-                            <div className="flex flex-col items-center">
-                              <span className="text-[10px] text-gray-400 uppercase font-bold">Cupos</span>
-                              <div className="flex items-center gap-1">
-                                <div className="flex items-center gap-1">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={currentFloor.capacities.PRIORITY_CAR}
-                                    onChange={(e) => {
-                                      const val = parseInt(e.target.value) || 0;
-                                      handleCapacityChange('PRIORITY_CAR', val - currentFloor.capacities.PRIORITY_CAR);
-                                    }}
-                                    className="w-16 h-6 text-center border rounded text-sm font-bold text-blue-800 focus:ring-1 focus:ring-blue-400 outline-none"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {!allowEdit && <span className="text-sm font-bold text-blue-600">{currentFloor.capacities.PRIORITY_CAR} Cupos ({currentFloor.prefixes?.PRIORITY_CAR || 'P'})</span>}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {renderGrid(currentFloor.prefixes?.PRIORITY_CAR || 'P', currentFloor.capacities.PRIORITY_CAR, 'PRIORITY')}
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-3xl font-black text-white tracking-tight">Mapa del Parqueadero</h2>
+                      <p className="text-slate-400 text-sm font-medium">Ubicación en tiempo real - {currentFloor?.name}</p>
                     </div>
                   </div>
 
-                  {/* EV Section */}
-                  <div className="bg-white p-5 rounded-2xl border border-green-100 shadow-sm">
-                    <div className="flex items-center justify-between mb-4 border-b border-green-50 pb-2">
-                      <h4 className="flex items-center gap-2 font-bold text-green-800">
-                        <Zap size={20} /> Zona Carga Eléctrica
-                      </h4>
-                      <div className="flex items-center gap-2">
-                        {allowEdit && (
-                          <div className="flex items-center gap-3">
-                            <div className="flex flex-col items-center">
-                              <span className="text-[10px] text-gray-400 uppercase font-bold">Prefijo</span>
-                              <input
-                                type="text"
-                                value={currentFloor.prefixes?.EV_CHARGING ?? ''}
-                                onChange={(e) => handlePrefixChange('EV_CHARGING', e.target.value)}
-                                className="w-10 h-6 border rounded text-xs text-center font-bold text-green-600 focus:ring-1 focus:ring-green-400 outline-none"
-                                maxLength={3}
-                              />
-                            </div>
-                            <div className="w-[1px] h-8 bg-gray-100 mx-1"></div>
-                            <div className="flex flex-col items-center">
-                              <span className="text-[10px] text-gray-400 uppercase font-bold">Cupos</span>
-                              <div className="flex items-center gap-1">
-                                <div className="flex items-center gap-1">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={currentFloor.capacities.EV_CHARGING}
-                                    onChange={(e) => {
-                                      const val = parseInt(e.target.value) || 0;
-                                      handleCapacityChange('EV_CHARGING', val - currentFloor.capacities.EV_CHARGING);
-                                    }}
-                                    className="w-16 h-6 text-center border rounded text-sm font-bold text-green-800 focus:ring-1 focus:ring-green-400 outline-none"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {!allowEdit && <span className="text-sm font-bold text-green-600">{currentFloor.capacities.EV_CHARGING} Cupos ({currentFloor.prefixes?.EV_CHARGING || 'E'})</span>}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {renderGrid(currentFloor.prefixes?.EV_CHARGING || 'E', currentFloor.capacities.EV_CHARGING, 'EV')}
-                    </div>
+                  <div className="bg-slate-900 rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl">
+                    <ParkingLayoutMap
+                      records={records}
+                      highlightedSpot={highlightedPlate}
+                      interactive={!isPublicView}
+                      showOnlyHighlighted={isPublicView}
+                    />
                   </div>
 
-                  {/* Moto Section */}
-                  <div className="bg-white p-5 rounded-2xl border border-orange-100 shadow-sm">
-                    <div className="flex items-center justify-between mb-4 border-b border-orange-50 pb-2">
-                      <h4 className="flex items-center gap-2 font-bold text-orange-800">
-                        <Bike size={20} /> Zona Motos
-                      </h4>
-                      <div className="flex items-center gap-2">
-                        {allowEdit && (
-                          <div className="flex items-center gap-3">
-                            <div className="flex flex-col items-center">
-                              <span className="text-[10px] text-gray-400 uppercase font-bold">Prefijo</span>
-                              <input
-                                type="text"
-                                value={currentFloor.prefixes?.MOTO ?? ''}
-                                onChange={(e) => handlePrefixChange('MOTO', e.target.value)}
-                                className="w-10 h-6 border rounded text-xs text-center font-bold text-orange-600 focus:ring-1 focus:ring-orange-400 outline-none"
-                                maxLength={3}
-                              />
-                            </div>
-                            <div className="w-[1px] h-8 bg-gray-100 mx-1"></div>
-                            <div className="flex flex-col items-center">
-                              <span className="text-[10px] text-gray-400 uppercase font-bold">Cupos</span>
-                              <div className="flex items-center gap-1">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={currentFloor.capacities.MOTO}
-                                  onChange={(e) => {
-                                    const val = parseInt(e.target.value) || 0;
-                                    handleCapacityChange('MOTO', val - currentFloor.capacities.MOTO);
-                                  }}
-                                  className="w-16 h-6 text-center border rounded text-sm font-bold text-orange-800 focus:ring-1 focus:ring-orange-400 outline-none"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {!allowEdit && <span className="text-sm font-bold text-orange-600">{currentFloor.capacities.MOTO} Cupos ({currentFloor.prefixes?.MOTO || 'M'})</span>}
+                  <div className="mt-8 flex flex-wrap gap-4 justify-center">
+                    <div className="bg-slate-900/50 px-4 py-2 rounded-xl border border-slate-700/50 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-[#7DBA2A]"></div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase">Libre</span>
+                    </div>
+                    <div className="bg-slate-900/50 px-4 py-2 rounded-xl border border-slate-700/50 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase">Ocupado</span>
+                    </div>
+                    {highlightedPlate && (
+                      <div className="bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/30 flex items-center gap-2 animate-pulse">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></div>
+                        <span className="text-[10px] font-black text-emerald-400 uppercase">Tu Vehículo: {highlightedPlate}</span>
                       </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                      {renderGrid(currentFloor.prefixes?.MOTO || 'M', currentFloor.capacities.MOTO, 'MOTO')}
-                    </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* legacy grid layout when hideMapVisual is true */
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="flex flex-wrap gap-4 mb-8 bg-gray-50 p-3 rounded-xl border border-gray-200 justify-center">
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
+                    <div className="w-4 h-4 bg-gray-100 border border-gray-200 rounded"></div> Libre
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
+                    <div className="w-4 h-4 bg-red-500 rounded"></div> Ocupado
                   </div>
                 </div>
 
-                {/* Right Col: Regular Cars */}
-                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm h-full flex flex-col">
-                  <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2 shrink-0">
-                    <h4 className="flex items-center gap-2 font-bold text-gray-800">
-                      <Car size={20} /> Zona General
-                    </h4>
-                    <div className="flex items-center gap-2">
-                      {allowEdit && (
-                        <div className="flex items-center gap-3">
-                          <div className="flex flex-col items-center">
-                            <span className="text-[10px] text-gray-400 uppercase font-bold">Prefijo</span>
-                            <input
-                              type="text"
-                              value={currentFloor.prefixes?.REGULAR_CAR ?? ''}
-                              onChange={(e) => handlePrefixChange('REGULAR_CAR', e.target.value)}
-                              className="w-10 h-6 border rounded text-xs text-center font-bold text-gray-600 focus:ring-1 focus:ring-blue-400 outline-none"
-                              maxLength={3}
-                            />
-                          </div>
-                          <div className="w-[1px] h-8 bg-gray-100 mx-1"></div>
-                          <div className="flex flex-col items-center">
-                            <span className="text-[10px] text-gray-400 uppercase font-bold">Cupos</span>
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="number"
-                                min="0"
-                                value={currentFloor.capacities.REGULAR_CAR}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value) || 0;
-                                  handleCapacityChange('REGULAR_CAR', val - currentFloor.capacities.REGULAR_CAR);
-                                }}
-                                className="w-16 h-6 text-center border rounded text-sm font-bold text-gray-800 focus:ring-1 focus:ring-blue-400 outline-none"
-                              />
-                            </div>
+                {currentFloor && (
+                  <div className="space-y-6">
+                    {(['REGULAR_CAR', 'PRIORITY_CAR', 'MOTO', 'EV_CHARGING'] as const).map(type => {
+                      const typeLabel = type === 'REGULAR_CAR' ? 'Zona General' :
+                        type === 'PRIORITY_CAR' ? 'Zona Prioritaria' :
+                          type === 'MOTO' ? 'Zona Motos' : 'Zona Carga Eléctrica';
+                      const typeKey = type.split('_')[0] as 'REGULAR' | 'PRIORITY' | 'MOTO' | 'EV';
+                      return (
+                        <div key={type} className="border-t pt-4 first:border-0 first:pt-0">
+                          <h4 className="font-bold text-gray-700 mb-2 truncate">{typeLabel}</h4>
+                          <div className="flex flex-wrap gap-1">
+                            {renderGrid(currentFloor.prefixes[type], currentFloor.capacities[type], typeKey === 'EV' ? 'EV' : (type.split('_')[0] as any))}
                           </div>
                         </div>
-                      )}
-                      {!allowEdit && <span className="text-sm font-bold text-gray-600">{currentFloor.capacities.REGULAR_CAR} Cupos ({currentFloor.prefixes?.REGULAR_CAR || 'C'})</span>}
-                    </div>
+                      );
+                    })}
                   </div>
-                  <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                    <div className="flex flex-wrap gap-2 justify-center content-start">
-                      {renderGrid(currentFloor.prefixes?.REGULAR_CAR || 'C', currentFloor.capacities.REGULAR_CAR, 'REGULAR')}
-                    </div>
-                  </div>
-                </div>
+                )}
+              </div>
+            )}
 
+            {/* Legacy Capacity Controls (Visible only if allowEdit) */}
+            {allowEdit && (
+              <div className="bg-white p-6 rounded-2xl border border-gray-200">
+                <h4 className="font-bold text-gray-800 mb-4">Configuración de Capacidades - {currentFloor?.name}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {(['REGULAR_CAR', 'PRIORITY_CAR', 'MOTO', 'EV_CHARGING'] as const).map(type => (
+                    <div key={type} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        {type === 'REGULAR_CAR' && <Car size={16} className="text-gray-600" />}
+                        {type === 'PRIORITY_CAR' && <Accessibility size={16} className="text-blue-600" />}
+                        {type === 'MOTO' && <Bike size={16} className="text-orange-600" />}
+                        {type === 'EV_CHARGING' && <Zap size={16} className="text-green-600" />}
+                        <span className="text-xs font-bold text-gray-700 uppercase">{type.replace('_', ' ')}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl font-black text-gray-900">{currentFloor?.capacities[type] || 0}</span>
+                        <div className="flex gap-1">
+                          <button onClick={() => handleCapacityChange(type, -1)} className="p-1 hover:bg-gray-200 rounded">-</button>
+                          <button onClick={() => handleCapacityChange(type, 1)} className="p-1 hover:bg-gray-200 rounded">+</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

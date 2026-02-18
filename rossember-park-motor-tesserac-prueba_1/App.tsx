@@ -8,7 +8,7 @@ import { AdminLogin } from './views/AdminLogin';
 import { SearchView } from './views/SearchView';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { inspectVehicle } from './services/geminiService';
-import { ParkingRecord, VehicleType, Floor } from './types';
+import { ParkingRecord, VehicleType, Floor, SpecialRate, SpecialRateType } from './types';
 
 // Default Capacity Configuration
 const DEFAULT_CAPACITIES = {
@@ -93,6 +93,11 @@ const AppContent: React.FC = () => {
     return savedAds ? JSON.parse(savedAds) : [];
   });
 
+  const [specialRates, setSpecialRates] = useState<SpecialRate[]>(() => {
+    const saved = localStorage.getItem('specialRates');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [adTrigger, setAdTrigger] = useState(0);
 
   // Client Customization State
@@ -131,6 +136,10 @@ const AppContent: React.FC = () => {
       }
     }
   }, [advertisements]);
+
+  useEffect(() => {
+    localStorage.setItem('specialRates', JSON.stringify(specialRates));
+  }, [specialRates]);
 
   useEffect(() => {
     if (clientLogo) {
@@ -176,7 +185,7 @@ const AppContent: React.FC = () => {
     return null;
   };
 
-  const calculateCost = (entryTime: number, type: VehicleType, isDisabled?: boolean, requiresCharging?: boolean) => {
+  const calculateCost = (entryTime: number, type: VehicleType, isDisabled?: boolean, requiresCharging?: boolean, plate?: string) => {
     const exitTime = Date.now();
     const minutes = Math.ceil((exitTime - entryTime) / 60000);
 
@@ -198,11 +207,37 @@ const AppContent: React.FC = () => {
       totalCost = Math.ceil(totalCost * (1 - discountPercent / 100));
     }
 
+    // Apply special rates (overrides/stacks with disability)
+    let specialRateLabel: string | undefined;
+    const specialRate = plate ? specialRates.find(r => r.plate === plate && r.isActive) : null;
+
+    if (specialRate) {
+      const isExpired = specialRate.expirationDate && specialRate.expirationDate < Date.now();
+
+      if (!isExpired) {
+        if (specialRate.type === SpecialRateType.MONTHLY) {
+          totalCost = 0;
+          specialRateLabel = 'Mensualidad Activa';
+        } else {
+          const discountPercent = specialRate.value;
+          totalCost = Math.ceil(totalCost * (1 - discountPercent / 100));
+          specialRateLabel = `${specialRate.type}: ${discountPercent}%`;
+        }
+      } else {
+        // Expired - record the label but don't apply the cost benefit? 
+        // User said: "informar en el panel de entrada que no la tiene y que tiene que renovar, dado el caso de que la mensualidad expire se le cobrara normal"
+        // So here we should probably NOT set specialRateLabel to 'Active' but maybe just return undefined for the label so it functions as normal.
+        // Actually, returning it as undefined is safer for cost calculation.
+      }
+    }
+
     return {
       cost: totalCost,
-      originalCost: isDisabled ? originalCost : undefined,
+      originalCost: (isDisabled || specialRate) ? originalCost : undefined,
       minutes,
-      exitTime
+      exitTime,
+      specialRateLabel,
+      specialRate: specialRate || undefined
     };
   };
 
@@ -313,6 +348,10 @@ const AppContent: React.FC = () => {
     setClientLogo(logo);
   };
 
+  const handleSpecialRatesUpdate = (newRates: SpecialRate[]) => {
+    setSpecialRates(newRates);
+  };
+
   const handleManualExit = (id: string) => {
     const record = records.find(r => r.id === id);
     if (record && record.status === 'ACTIVE') {
@@ -389,6 +428,7 @@ const AppContent: React.FC = () => {
           adTrigger={adTrigger}
           onCancelEntry={handleCancelEntry}
           clientLogo={clientLogo}
+          specialRates={specialRates}
         />
       } />
 
@@ -448,6 +488,8 @@ const AppContent: React.FC = () => {
             onBackToSelector={handleAdminLogout}
             clientLogo={clientLogo}
             onUpdateClientLogo={handleClientLogoUpdate}
+            specialRates={specialRates}
+            onSpecialRatesUpdate={handleSpecialRatesUpdate}
           />
         </ProtectedRoute>
       } />

@@ -237,3 +237,20 @@
 .animate-shake {
     animation: shake 0.5s ease-in-out;
 }
+
+@keyframes neon-pulse {
+    0%,
+    100% {
+        box-shadow: 0 0 10px rgba(34, 197, 94, 0.5), 0 0 20px rgba(34, 197, 94, 0.3);
+        transform: scale(1);
+    }
+
+    50% {
+        box-shadow: 0 0 25px rgba(34, 197, 94, 0.8), 0 0 50px rgba(34, 197, 94, 0.6);
+        transform: scale(1.05);
+    }
+}
+
+.animate-neon-pulse {
+    animation: neon-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
