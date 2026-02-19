@@ -8,6 +8,9 @@ interface ParkingLayoutMapProps {
     records?: ParkingRecord[];
     interactive?: boolean;
     showOnlyHighlighted?: boolean;
+    mapImageUrl?: string;
+    floorId?: string;
+    showPlates?: boolean;
 }
 
 /**
@@ -18,23 +21,43 @@ export const ParkingLayoutMap: React.FC<ParkingLayoutMapProps> = ({
     isEntryAssignment,
     records = [],
     interactive = false,
-    showOnlyHighlighted = false
+    showOnlyHighlighted = false,
+    mapImageUrl,
+    floorId,
+    showPlates = false
 }) => {
     const [selectedSpot, setSelectedSpot] = useState<string | null>(null);
 
-    // Define zones and their grid logical positions
-    const spots = [
-        // Top Row stalls
-        ...Array.from({ length: 5 }, (_, i) => ({ id: `P-00${i + 1}`, x: i + 3, y: 1, type: 'PRIORITY', rotation: 'top' })),
-        ...Array.from({ length: 3 }, (_, i) => ({ id: `C-01${i + 1}`, x: i + 8, y: 1, type: 'REGULAR', rotation: 'top' })),
+    // Define zones and their grid logical positions based on floor
+    const spots = useMemo(() => {
+        const isFloor1 = !floorId || floorId === 'default' || floorId === 'floor-1';
 
-        // Bottom Row stalls
-        ...Array.from({ length: 5 }, (_, i) => ({ id: `E-00${i + 1}`, x: i + 3, y: 3, type: 'EV', rotation: 'bottom' })),
-        ...Array.from({ length: 3 }, (_, i) => ({ id: `C-00${i + 1}`, x: i + 8, y: 3, type: 'REGULAR', rotation: 'bottom' })),
-
-        // Moto vertical stalls (Right side)
-        ...Array.from({ length: 4 }, (_, i) => ({ id: `M-00${i + 1}`, x: 10, y: 2, type: 'MOTO', rotation: 'right' })),
-    ];
+        if (isFloor1) {
+            return [
+                // Top Row stalls
+                ...Array.from({ length: 5 }, (_, i) => ({ id: `P-00${i + 1}`, type: 'PRIORITY', rotation: 'top' })),
+                ...Array.from({ length: 3 }, (_, i) => ({ id: `C-01${i + 1}`, type: 'REGULAR', rotation: 'top' })),
+                // Bottom Row stalls
+                ...Array.from({ length: 5 }, (_, i) => ({ id: `E-00${i + 1}`, type: 'EV', rotation: 'bottom' })),
+                ...Array.from({ length: 3 }, (_, i) => ({ id: `C-00${i + 1}`, type: 'REGULAR', rotation: 'bottom' })),
+                // Moto stalls (Right side)
+                ...Array.from({ length: 4 }, (_, i) => ({ id: `M-00${i + 1}`, type: 'MOTO', rotation: 'right' })),
+            ];
+        } else {
+            // Piso 2 / Courtyard layout (U shape/Perimeter)
+            return [
+                // Top Edge
+                ...Array.from({ length: 6 }, (_, i) => ({ id: `C-00${i + 1}`, type: 'REGULAR', rotation: 'top' })),
+                ...Array.from({ length: 4 }, (_, i) => ({ id: `P-00${i + 1}`, type: 'PRIORITY', rotation: 'top' })),
+                // Left Edge
+                ...Array.from({ length: 4 }, (_, i) => ({ id: `M-01${i + 1}`, type: 'MOTO', rotation: 'left' })),
+                // Right Edge
+                ...Array.from({ length: 4 }, (_, i) => ({ id: `E-00${i + 1}`, type: 'EV', rotation: 'right' })),
+                // Bottom Edge
+                ...Array.from({ length: 5 }, (_, i) => ({ id: `M-00${i + 1}`, type: 'MOTO', rotation: 'bottom' })),
+            ];
+        }
+    }, [floorId]);
 
     const getNormalizedId = (fullId: string) => {
         const parts = fullId.split('-');
@@ -47,16 +70,25 @@ export const ParkingLayoutMap: React.FC<ParkingLayoutMapProps> = ({
         // Check if the highlightedSpot is a plate in our records
         const recordByPlate = records.find(r => r.plate === highlightedSpot && r.status === 'ACTIVE');
         if (recordByPlate && recordByPlate.spotNumber) {
+            // Check if floor matches if floorId is provided
+            if (floorId && recordByPlate.floorId && recordByPlate.floorId !== floorId) {
+                return null;
+            }
             return getNormalizedId(recordByPlate.spotNumber);
         }
 
         // Otherwise treat it as a normalized spot ID
         return getNormalizedId(highlightedSpot);
-    }, [highlightedSpot, records]);
+    }, [highlightedSpot, records, floorId]);
 
     // Find record for a spot
     const getRecordForSpot = (spotId: string) => {
-        const record = records.find(r => r.status === 'ACTIVE' && getNormalizedId(r.spotNumber || '') === spotId);
+        const record = records.find(r => {
+            const matchesSpot = getNormalizedId(r.spotNumber || '') === spotId;
+            const matchesFloor = !floorId || (r.floorId || 'default') === floorId;
+            return r.status === 'ACTIVE' && matchesSpot && matchesFloor;
+        });
+
         if (showOnlyHighlighted && record) {
             const isMatch = normalizedHighlight === getNormalizedId(record.spotNumber || '');
             return isMatch ? record : null;
@@ -73,24 +105,32 @@ export const ParkingLayoutMap: React.FC<ParkingLayoutMapProps> = ({
 
     return (
         <div className="relative w-full aspect-[16/9] bg-[#5D5D6E] rounded-2xl overflow-hidden shadow-inner border-4 border-slate-700 select-none">
-
-            {/* Top Green Border (Grass) */}
-            <div className="absolute top-0 left-0 right-0 h-[10%] bg-[#7DBA2A] border-b-4 border-[#6AA024] flex items-center px-4">
-                {/* Tree Top-Left */}
-                <div className="absolute top-1 left-2 w-16 h-16 bg-[#4A7C18] rounded-full shadow-lg border-2 border-[#3D6614] flex items-center justify-center">
-                    <div className="w-12 h-12 bg-[#5E9422] rounded-full border border-[#4A7C18]"></div>
-                    <div className="absolute w-2 h-2 bg-yellow-200/20 rounded-full top-3 left-4"></div>
+            {mapImageUrl ? (
+                <div className="absolute inset-0 w-full h-full">
+                    <img src={mapImageUrl} alt="Parking Map" className="w-full h-full object-cover opacity-80" />
+                    <div className="absolute inset-0 bg-slate-900/40"></div>
                 </div>
-            </div>
+            ) : (
+                <>
+                    {/* Top Green Border (Grass) */}
+                    <div className="absolute top-0 left-0 right-0 h-[10%] bg-[#7DBA2A] border-b-4 border-[#6AA024] flex items-center px-4">
+                        {/* Tree Top-Left */}
+                        <div className="absolute top-1 left-2 w-16 h-16 bg-[#4A7C18] rounded-full shadow-lg border-2 border-[#3D6614] flex items-center justify-center">
+                            <div className="w-12 h-12 bg-[#5E9422] rounded-full border border-[#4A7C18]"></div>
+                            <div className="absolute w-2 h-2 bg-yellow-200/20 rounded-full top-3 left-4"></div>
+                        </div>
+                    </div>
 
-            {/* Bottom Green Border (Grass) */}
-            <div className="absolute bottom-0 left-0 right-0 h-[10%] bg-[#7DBA2A] border-t-4 border-[#6AA024]">
-                {/* Decorative Plants Bottom-Left */}
-                <div className="absolute bottom-1 left-4 flex gap-1">
-                    <div className="w-8 h-8 bg-[#4A7C18] rounded-full shadow-md border border-[#3D6614]"></div>
-                    <div className="w-6 h-6 bg-[#4A7C18] rounded-full shadow-md border border-[#3D6614] -mt-2"></div>
-                </div>
-            </div>
+                    {/* Bottom Green Border (Grass) */}
+                    <div className="absolute bottom-0 left-0 right-0 h-[10%] bg-[#7DBA2A] border-t-4 border-[#6AA024]">
+                        {/* Decorative Plants Bottom-Left */}
+                        <div className="absolute bottom-1 left-4 flex gap-1">
+                            <div className="w-8 h-8 bg-[#4A7C18] rounded-full shadow-md border border-[#3D6614]"></div>
+                            <div className="w-6 h-6 bg-[#4A7C18] rounded-full shadow-md border border-[#3D6614] -mt-2"></div>
+                        </div>
+                    </div>
+                </>
+            )}
 
             {/* Parking Area Container */}
             <div className="absolute inset-[10%] p-4 flex flex-col justify-between">
@@ -116,7 +156,14 @@ export const ParkingLayoutMap: React.FC<ParkingLayoutMapProps> = ({
                                         } ${isSelected ? 'ring-2 ring-yellow-400 z-20 bg-yellow-400/20' : ''}`}
                                 >
                                     {isOccupied ? (
-                                        <Car size={16} className={`${record.vehicleType === VehicleType.MOTORCYCLE ? 'text-orange-400' : 'text-slate-200'}`} />
+                                        <div className="flex flex-col items-center gap-0.5">
+                                            <Car size={14} className={`${record.vehicleType === VehicleType.MOTORCYCLE ? 'text-orange-400' : 'text-slate-200'}`} />
+                                            {showPlates && (
+                                                <span className="bg-white/80 text-slate-900 border border-slate-900 px-0.5 rounded-[1px] text-[5px] font-black leading-none">
+                                                    {record.plate}
+                                                </span>
+                                            )}
+                                        </div>
                                     ) : (
                                         spot.type === 'PRIORITY' ? <div className="border-2 border-white/60 p-1 rounded text-white font-bold opacity-30 text-[8px]">P</div> : null
                                     )}
@@ -142,6 +189,64 @@ export const ParkingLayoutMap: React.FC<ParkingLayoutMapProps> = ({
 
                     {/* Central Lane Markings */}
                     <div className="w-full h-0 border-t-2 border-dashed border-white/20"></div>
+
+                    {/* Left/Right Vertical Rows for Courtyard Layout */}
+                    <div className="absolute inset-0 flex justify-between pointer-events-none">
+                        <div className="w-[10%] flex flex-col gap-1 items-center justify-center p-1 pointer-events-auto">
+                            {spots.filter(s => s.rotation === 'left').map(spot => {
+                                const isHighlight = normalizedHighlight === spot.id;
+                                const record = getRecordForSpot(spot.id);
+                                const isOccupied = !!record;
+                                const isSelected = selectedSpot === spot.id;
+                                return (
+                                    <div
+                                        key={spot.id}
+                                        onClick={() => handleSpotClick(spot.id)}
+                                        className={`w-full aspect-[4/3] border-y border-r border-white/60 relative flex items-center justify-center transition-all cursor-pointer hover:bg-white/10 ${isHighlight ? 'bg-emerald-500/40 animate-neon-pulse z-10' : isOccupied ? 'bg-red-500/30' : ''} ${isSelected ? 'ring-2 ring-yellow-400 z-20 bg-yellow-400/20' : ''}`}
+                                    >
+                                        {isOccupied ? (
+                                            <div className="flex flex-col items-center gap-0.5">
+                                                <Car size={12} className={`${record.vehicleType === VehicleType.MOTORCYCLE ? 'text-orange-400' : 'text-slate-200'}`} />
+                                                {showPlates && (
+                                                    <span className="bg-white/80 text-slate-900 border border-slate-900 px-0.5 rounded-[1px] text-[4px] font-black leading-none">
+                                                        {record.plate}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ) : null}
+                                        <span className="absolute left-0.5 text-[5px] text-white/30 font-bold -rotate-90">{spot.id}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="w-[10%] flex flex-col gap-1 items-center justify-center p-1 pointer-events-auto">
+                            {spots.filter(s => s.rotation === 'right').map(spot => {
+                                const isHighlight = normalizedHighlight === spot.id;
+                                const record = getRecordForSpot(spot.id);
+                                const isOccupied = !!record;
+                                const isSelected = selectedSpot === spot.id;
+                                return (
+                                    <div
+                                        key={spot.id}
+                                        onClick={() => handleSpotClick(spot.id)}
+                                        className={`w-full aspect-[4/3] border-y border-l border-white/60 relative flex items-center justify-center transition-all cursor-pointer hover:bg-white/10 ${isHighlight ? 'bg-emerald-500/40 animate-neon-pulse z-10' : isOccupied ? 'bg-red-500/30' : ''} ${isSelected ? 'ring-2 ring-yellow-400 z-20 bg-yellow-400/20' : ''}`}
+                                    >
+                                        {isOccupied ? (
+                                            <div className="flex flex-col items-center gap-0.5">
+                                                <Car size={12} className={`${record.vehicleType === VehicleType.MOTORCYCLE ? 'text-orange-400' : 'text-slate-200'}`} />
+                                                {showPlates && (
+                                                    <span className="bg-white/80 text-slate-900 border border-slate-900 px-0.5 rounded-[1px] text-[4px] font-black leading-none">
+                                                        {record.plate}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ) : null}
+                                        <span className="absolute right-0.5 text-[5px] text-white/30 font-bold rotate-90">{spot.id}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
                 </div>
 
                 {/* Bottom Stall Row */}
@@ -163,7 +268,14 @@ export const ParkingLayoutMap: React.FC<ParkingLayoutMapProps> = ({
                                         } ${isSelected ? 'ring-2 ring-yellow-400 z-20 bg-yellow-400/20' : ''}`}
                                 >
                                     {isOccupied ? (
-                                        <Car size={16} className={`${record.vehicleType === VehicleType.MOTORCYCLE ? 'text-orange-400' : 'text-slate-200'}`} />
+                                        <div className="flex flex-col items-center gap-0.5">
+                                            <Car size={14} className={`${record.vehicleType === VehicleType.MOTORCYCLE ? 'text-orange-400' : 'text-slate-200'}`} />
+                                            {showPlates && (
+                                                <span className="bg-white/80 text-slate-900 border border-slate-900 px-0.5 rounded-[1px] text-[5px] font-black leading-none">
+                                                    {record.plate}
+                                                </span>
+                                            )}
+                                        </div>
                                     ) : (
                                         spot.type === 'EV' ? <Zap size={16} className="text-white/20" /> : null
                                     )}

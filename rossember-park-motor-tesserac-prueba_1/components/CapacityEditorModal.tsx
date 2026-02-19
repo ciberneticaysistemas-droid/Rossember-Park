@@ -17,7 +17,7 @@ export const CapacityEditorModal: React.FC<CapacityEditorModalProps> = ({ capaci
 
     const handleChange = (key: keyof typeof values, value: string) => {
         const numValue = parseInt(value) || 0;
-        setValues(prev => ({ ...prev, [key]: Math.max(0, numValue) }));
+        setValues(prev => ({ ...prev, [key]: numValue }));
     };
 
     return (

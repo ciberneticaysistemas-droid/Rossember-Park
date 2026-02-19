@@ -14,6 +14,7 @@ export interface VehicleDetails {
 export interface Floor {
   id: string;
   name: string;
+  mapImageUrl?: string;
   capacities: {
     REGULAR_CAR: number;
     PRIORITY_CAR: number;

@@ -201,13 +201,16 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ records, onClose, on
                   <div className="flex justify-between items-start mb-4 mt-2">
                     <div className="flex items-center gap-3">
                       <div className={`p-3 rounded-2xl ${record.vehicleType === VehicleType.MOTORCYCLE ? 'bg-orange-50 text-orange-600' :
-                          record.vehicleType === VehicleType.ELECTRIC ? 'bg-yellow-50 text-yellow-600' :
-                            'bg-blue-50 text-blue-600'
+                        record.vehicleType === VehicleType.ELECTRIC ? 'bg-yellow-50 text-yellow-600' :
+                          'bg-blue-50 text-blue-600'
                         }`}>
                         {getVehicleIcon(record.vehicleType)}
                       </div>
                       <div>
                         <h4 className="font-black text-xl text-slate-800 tracking-tight">{record.plate}</h4>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight -mt-1 mb-1">
+                          ID: {record.ownerId || 'Ocasional'}
+                        </div>
                         <div className="flex items-center gap-1 text-xs font-medium text-slate-500">
                           {record.status === 'ACTIVE' ? (
                             <span className="flex items-center gap-1 text-green-600"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Activo</span>

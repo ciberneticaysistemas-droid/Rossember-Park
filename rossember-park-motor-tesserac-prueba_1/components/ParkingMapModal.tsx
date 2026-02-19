@@ -63,6 +63,16 @@ export const ParkingMapModal: React.FC<ParkingMapModalProps> = ({
     }
   }, [floors]); // Depend on floors prop
 
+  // Auto-switch to floor when highlightedPlate is provided
+  useEffect(() => {
+    if (highlightedPlate) {
+      const record = records.find(r => r.plate === highlightedPlate && r.status === 'ACTIVE');
+      if (record && record.floorId && record.floorId !== selectedFloorId) {
+        setSelectedFloorId(record.floorId);
+      }
+    }
+  }, [highlightedPlate, records]);
+
   const currentFloor = effectiveFloors.find(f => f.id === selectedFloorId) || effectiveFloors[0];
 
   const handleCapacityChange = (type: 'REGULAR_CAR' | 'PRIORITY_CAR' | 'MOTO' | 'EV_CHARGING', delta: number) => {
@@ -159,9 +169,11 @@ export const ParkingMapModal: React.FC<ParkingMapModalProps> = ({
 
   const handleAddFloor = () => {
     if (!onFloorsUpdate || !floors) return;
+    const floorIndex = floors.length;
     const newFloor: Floor = {
       id: crypto.randomUUID(),
-      name: `Piso ${floors.length + 1}`,
+      name: `Piso ${floorIndex + 1}`,
+      mapImageUrl: floorIndex === 1 ? '/piso2.png' : undefined,
       capacities: {
         REGULAR_CAR: 0,
         PRIORITY_CAR: 0,
@@ -382,6 +394,9 @@ export const ParkingMapModal: React.FC<ParkingMapModalProps> = ({
                       highlightedSpot={highlightedPlate}
                       interactive={!isPublicView}
                       showOnlyHighlighted={isPublicView}
+                      mapImageUrl={currentFloor?.mapImageUrl}
+                      floorId={currentFloor?.id}
+                      showPlates={!isPublicView}
                     />
                   </div>
 
@@ -450,11 +465,20 @@ export const ParkingMapModal: React.FC<ParkingMapModalProps> = ({
                         {type === 'EV_CHARGING' && <Zap size={16} className="text-green-600" />}
                         <span className="text-xs font-bold text-gray-700 uppercase">{type.replace('_', ' ')}</span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xl font-black text-gray-900">{currentFloor?.capacities[type] || 0}</span>
-                        <div className="flex gap-1">
-                          <button onClick={() => handleCapacityChange(type, -1)} className="p-1 hover:bg-gray-200 rounded">-</button>
-                          <button onClick={() => handleCapacityChange(type, 1)} className="p-1 hover:bg-gray-200 rounded">+</button>
+                      <div className="flex items-center justify-between gap-2">
+                        <input
+                          type="number"
+                          value={currentFloor?.capacities[type] || 0}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 0;
+                            const currentVal = currentFloor?.capacities[type] || 0;
+                            handleCapacityChange(type, val - currentVal);
+                          }}
+                          className="w-full text-2xl font-black text-gray-900 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
+                        />
+                        <div className="flex flex-col gap-1">
+                          <button onClick={() => handleCapacityChange(type, 1)} className="p-0.5 hover:bg-gray-200 rounded text-xs">+</button>
+                          <button onClick={() => handleCapacityChange(type, -1)} className="p-0.5 hover:bg-gray-200 rounded text-xs">-</button>
                         </div>
                       </div>
                     </div>

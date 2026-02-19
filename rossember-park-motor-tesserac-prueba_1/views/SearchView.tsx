@@ -267,8 +267,23 @@ export const SearchView: React.FC<SearchViewProps> = ({ records, capacities, rat
                                     <div>
                                         <p className="text-white/40 text-xs font-bold uppercase tracking-wider mb-1">Ubicación</p>
                                         <p className="text-xl font-bold text-white">
-                                            {searchResult.vehicleType === VehicleType.MOTORCYCLE ? "Zona Motos" : `Puesto ${searchResult.spotNumber}`}
+                                            {(() => {
+                                                const floor = floors?.find(f => f.id === searchResult.floorId);
+                                                const floorName = floor ? floor.name : 'Piso 1';
+                                                const typeText = searchResult.vehicleType === VehicleType.MOTORCYCLE ? "Zona Motos" : `Puesto ${searchResult.spotNumber}`;
+                                                return `${floorName} - ${typeText}`;
+                                            })()}
                                         </p>
+                                        <div className="flex items-center gap-2 mt-1 text-emerald-400 font-bold text-xs uppercase animate-pulse">
+                                            <Info size={12} />
+                                            Ruta: {(() => {
+                                                const floor = floors?.find(f => f.id === searchResult.floorId);
+                                                if (floor && floor.name.includes('2')) {
+                                                    return "Siga por la rampa al Segundo Piso";
+                                                }
+                                                return "Siga derecho por el Primer Piso";
+                                            })()}
+                                        </div>
                                     </div>
                                 </div>
 

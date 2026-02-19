@@ -59,6 +59,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const [showPersonalization, setShowPersonalization] = useState(false);
     const [showSpecialRates, setShowSpecialRates] = useState(false);
     const [viewMode, setViewMode] = useState<'DASHBOARD' | 'MAP'>('DASHBOARD');
+    const [selectedDashboardFloorId, setSelectedDashboardFloorId] = useState<string>(floors?.[0]?.id || 'default');
 
     const activeRecords = records.filter(r => r.status === 'ACTIVE');
     const completedRecords = records.filter(r => r.status === 'COMPLETED');
@@ -245,25 +246,39 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                 {/* Dashboard Sidebar Aesthetic */}
                                 <div className="w-full md:w-64 space-y-4">
                                     <h3 className="text-xl font-bold text-white mb-6">Pisos</h3>
-                                    <div className="bg-blue-600/10 border-2 border-blue-500/30 p-4 rounded-xl">
-                                        <h4 className="font-bold text-blue-400">Piso 1</h4>
-                                        <p className="text-xs text-blue-300/60 font-medium">Total: 25 cupos</p>
-                                    </div>
-                                    <div className="p-4 rounded-xl border border-slate-700 opacity-40 grayscale">
-                                        <h4 className="font-bold text-slate-400">Piso 2</h4>
-                                        <p className="text-xs text-slate-500">Próximamente</p>
-                                    </div>
+                                    {(floors && floors.length > 0 ? floors : [{ id: 'default', name: 'Piso 1', capacities }]).map(floor => (
+                                        <div
+                                            key={floor.id}
+                                            onClick={() => setSelectedDashboardFloorId(floor.id)}
+                                            className={`p-4 rounded-xl border transition-all cursor-pointer ${selectedDashboardFloorId === floor.id ? 'bg-blue-600/10 border-blue-500/50 shadow-lg' : 'border-slate-700 bg-slate-800/50 hover:bg-slate-750'}`}
+                                        >
+                                            <h4 className={`font-bold ${selectedDashboardFloorId === floor.id ? 'text-blue-400' : 'text-slate-400'}`}>{floor.name}</h4>
+                                            <p className="text-xs text-slate-500">Total: {(Object.values(floor.capacities) as number[]).reduce((a, b) => a + b, 0)} cupos</p>
+                                        </div>
+                                    ))}
 
                                     <div className="mt-8 pt-8 border-t border-slate-700">
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between text-xs">
-                                                <span className="text-slate-400 uppercase font-bold tracking-widest">Resumen</span>
-                                                <span className="text-emerald-400 font-black">{records.filter(r => r.status === 'ACTIVE').length} / 25</span>
+                                                <span className="text-slate-400 uppercase font-bold tracking-widest">Resumen Piso</span>
+                                                <span className="text-emerald-400 font-black">
+                                                    {records.filter(r => r.status === 'ACTIVE' && (r.floorId || 'default') === selectedDashboardFloorId).length} / {(() => {
+                                                        const f = (floors && floors.length > 0 ? floors : [{ id: 'default', name: 'Piso 1', capacities }]).find(f => f.id === selectedDashboardFloorId);
+                                                        return f ? (Object.values(f.capacities) as number[]).reduce((a, b) => a + b, 0) : 0;
+                                                    })()}
+                                                </span>
                                             </div>
                                             <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
                                                 <div
                                                     className="h-full bg-emerald-500 transition-all duration-1000"
-                                                    style={{ width: `${(records.filter(r => r.status === 'ACTIVE').length / 25) * 100}%` }}
+                                                    style={{
+                                                        width: `${(() => {
+                                                            const active = records.filter(r => r.status === 'ACTIVE' && (r.floorId || 'default') === selectedDashboardFloorId).length;
+                                                            const f = (floors && floors.length > 0 ? floors : [{ id: 'default', name: 'Piso 1', capacities }]).find(f => f.id === selectedDashboardFloorId);
+                                                            const total = f ? (Object.values(f.capacities) as number[]).reduce((a, b) => a + b, 0) : 1;
+                                                            return (active / total) * 100;
+                                                        })()}%`
+                                                    }}
                                                 ></div>
                                             </div>
                                         </div>
@@ -274,12 +289,21 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                     <div className="flex items-center justify-between mb-6">
                                         <div>
                                             <h2 className="text-3xl font-black text-white tracking-tight">Dashboard de Ocupación</h2>
-                                            <p className="text-slate-400 text-sm font-medium">Visualización en tiempo real e interactiva</p>
+                                            <p className="text-slate-400 text-sm font-medium">Visualización en tiempo real - {(() => {
+                                                const f = (floors && floors.length > 0 ? floors : [{ id: 'default', name: 'Piso 1', capacities }]).find(f => f.id === selectedDashboardFloorId);
+                                                return f?.name;
+                                            })()}</p>
                                         </div>
                                     </div>
 
                                     <div className="bg-slate-900 rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl">
-                                        <ParkingLayoutMap records={records} interactive={true} />
+                                        <ParkingLayoutMap
+                                            records={records}
+                                            interactive={true}
+                                            floorId={selectedDashboardFloorId}
+                                            mapImageUrl={(floors && floors.length > 0 ? floors : []).find(f => f.id === selectedDashboardFloorId)?.mapImageUrl}
+                                            showPlates={true}
+                                        />
                                     </div>
 
                                     <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -288,28 +312,48 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                                 <Accessibility size={16} />
                                                 <span className="text-[10px] font-black uppercase tracking-widest">Prioritarios</span>
                                             </div>
-                                            <p className="text-2xl font-black text-white">{records.filter(r => r.status === 'ACTIVE' && r.spotNumber?.includes('P-')).length} / 5</p>
+                                            <p className="text-2xl font-black text-white">
+                                                {records.filter(r => r.status === 'ACTIVE' && (r.floorId || 'default') === selectedDashboardFloorId && r.spotNumber?.includes('P-')).length} / {(() => {
+                                                    const f = (floors && floors.length > 0 ? floors : [{ id: 'default', capacities }]).find(f => f.id === selectedDashboardFloorId);
+                                                    return f?.capacities.PRIORITY_CAR || 0;
+                                                })()}
+                                            </p>
                                         </div>
                                         <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
                                             <div className="flex items-center gap-2 text-emerald-400 mb-1">
                                                 <Zap size={16} />
                                                 <span className="text-[10px] font-black uppercase tracking-widest">Eléctricos</span>
                                             </div>
-                                            <p className="text-2xl font-black text-white">{records.filter(r => r.status === 'ACTIVE' && r.spotNumber?.includes('E-')).length} / 5</p>
+                                            <p className="text-2xl font-black text-white">
+                                                {records.filter(r => r.status === 'ACTIVE' && (r.floorId || 'default') === selectedDashboardFloorId && r.spotNumber?.includes('E-')).length} / {(() => {
+                                                    const f = (floors && floors.length > 0 ? floors : [{ id: 'default', capacities }]).find(f => f.id === selectedDashboardFloorId);
+                                                    return f?.capacities.EV_CHARGING || 0;
+                                                })()}
+                                            </p>
                                         </div>
                                         <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
                                             <div className="flex items-center gap-2 text-orange-400 mb-1">
                                                 <Bike size={16} />
                                                 <span className="text-[10px] font-black uppercase tracking-widest">Motos</span>
                                             </div>
-                                            <p className="text-2xl font-black text-white">{records.filter(r => r.status === 'ACTIVE' && r.spotNumber?.includes('M-')).length} / 4</p>
+                                            <p className="text-2xl font-black text-white">
+                                                {records.filter(r => r.status === 'ACTIVE' && (r.floorId || 'default') === selectedDashboardFloorId && r.spotNumber?.includes('M-')).length} / {(() => {
+                                                    const f = (floors && floors.length > 0 ? floors : [{ id: 'default', capacities }]).find(f => f.id === selectedDashboardFloorId);
+                                                    return f?.capacities.MOTO || 0;
+                                                })()}
+                                            </p>
                                         </div>
                                         <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
                                             <div className="flex items-center gap-2 text-slate-400 mb-1">
                                                 <Car size={16} />
                                                 <span className="text-[10px] font-black uppercase tracking-widest">Regulares</span>
                                             </div>
-                                            <p className="text-2xl font-black text-white">{records.filter(r => r.status === 'ACTIVE' && r.spotNumber?.includes('C-')).length} / 11</p>
+                                            <p className="text-2xl font-black text-white">
+                                                {records.filter(r => r.status === 'ACTIVE' && (r.floorId || 'default') === selectedDashboardFloorId && r.spotNumber?.includes('C-')).length} / {(() => {
+                                                    const f = (floors && floors.length > 0 ? floors : [{ id: 'default', capacities }]).find(f => f.id === selectedDashboardFloorId);
+                                                    return f?.capacities.REGULAR_CAR || 0;
+                                                })()}
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
@@ -513,7 +557,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     floors={floors}
                     allowEdit={true}
                     onManualExit={onManualExit}
-                    hideMapVisual={true}
+                    hideMapVisual={false}
                 />
             )}
 
