@@ -12,62 +12,8 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onCapture, isProcessing,
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const startCamera = useCallback(async () => {
-    try {
-      setError(null);
-
-      // Enumerate all video devices
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(device => device.kind === 'videoinput');
-
-      console.log('Available video devices:', videoDevices);
-
-      let constraints: MediaStreamConstraints;
-
-      if (mode === 'EXIT') {
-        // For EXIT mode, try to find and use a USB camera
-        // USB cameras typically have labels containing "USB" or are not the default built-in camera
-        const usbCamera = videoDevices.find(device =>
-          device.label.toLowerCase().includes('usb') ||
-          device.label.toLowerCase().includes('external') ||
-          device.label.toLowerCase().includes('webcam')
-        );
-
-        if (usbCamera) {
-          console.log('Using USB camera for EXIT mode:', usbCamera.label);
-          constraints = {
-            video: { deviceId: { exact: usbCamera.deviceId } },
-            audio: false
-          };
-        } else {
-          // If no USB camera found, use the last camera in the list (often external)
-          const lastCamera = videoDevices[videoDevices.length - 1];
-          console.log('No USB camera found, using last available camera:', lastCamera?.label);
-          constraints = {
-            video: lastCamera ? { deviceId: { exact: lastCamera.deviceId } } : { facingMode: 'environment' },
-            audio: false
-          };
-        }
-      } else {
-        // For ENTRY mode, use default camera (first in list or environment facing)
-        console.log('Using default camera for ENTRY mode');
-        constraints = {
-          video: { facingMode: 'environment' },
-          audio: false
-        };
-      }
-
-      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-    } catch (err) {
-      console.error("Error accessing camera:", err);
-      setError("No se pudo acceder a la cámara. Verifica los permisos.");
-    }
-  }, [mode]);
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
 
   const stopCamera = useCallback(() => {
     if (stream) {
@@ -76,79 +22,172 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onCapture, isProcessing,
     }
   }, [stream]);
 
-  // Cleanup on unmount and restart when mode changes
+  const startCamera = async (deviceId: string) => {
+    try {
+      console.log("Starting device:", deviceId);
+
+      // Stop anything currently running
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+
+      // Request HD resolution for better license plate detection
+      const constraints = {
+        video: {
+          deviceId: { exact: deviceId },
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 }
+        },
+        audio: false
+      };
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      setStream(mediaStream);
+      setActiveDeviceId(deviceId);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+
+        // Wait for metadata to be ready then play
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(e => {
+            console.error("Play failed after metadata:", e);
+          });
+        };
+      }
+    } catch (err) {
+      console.error("Critical camera start error:", err);
+      // Fallback to default resolution if HD fails
+      try {
+        const fallbackConstraints = {
+          video: { deviceId: { exact: deviceId } },
+          audio: false
+        };
+        const fallbackStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+        setStream(fallbackStream);
+        setActiveDeviceId(deviceId);
+        if (videoRef.current) {
+          videoRef.current.srcObject = fallbackStream;
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play().catch(e => {
+              console.error("Play failed after fallback metadata:", e);
+            });
+          };
+        }
+      } catch (e2) {
+        setError("Error: La cámara no responde. Revisa que no esté abierta en otra app.");
+      }
+    }
+  };
+
+  // Sync devices and select based on mode
   useEffect(() => {
-    startCamera();
-    return () => {
-      stopCamera();
+    const syncDevices = async () => {
+      try {
+        // Simple permission check
+        const initStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        initStream.getTracks().forEach(t => t.stop());
+
+        const all = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = all.filter(d => d.kind === 'videoinput' && d.deviceId);
+        setDevices(videoInputs);
+
+        let selectedId = '';
+        if (mode === 'EXIT') {
+          // Priority: Logitech/Brio
+          const brio = videoInputs.find(d => {
+            const l = d.label.toLowerCase();
+            return l.includes('brio') || l.includes('logitech') || l.includes('4k');
+          });
+          selectedId = (brio || videoInputs[videoInputs.length - 1])?.deviceId || '';
+        } else {
+          // Priority: Integrated (Not Logitech)
+          const internal = videoInputs.find(d => {
+            const l = d.label.toLowerCase();
+            return (l.includes('integrated') || l.includes('pc camera') || l.includes('vga')) &&
+              !(l.includes('logitech') || l.includes('brio'));
+          });
+          selectedId = (internal || videoInputs[0])?.deviceId || '';
+        }
+
+        if (selectedId) {
+          startCamera(selectedId);
+        }
+      } catch (e) {
+        setError("Permiso de cámara denegado.");
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]); // Restart camera when mode changes
+
+    syncDevices();
+    return () => stopCamera();
+  }, [mode]);
+
+  const switchCamera = () => {
+    if (devices.length < 2) return;
+    const currentIdx = devices.findIndex(d => d.deviceId === activeDeviceId);
+    const nextIdx = (currentIdx + 1) % devices.length;
+    startCamera(devices[nextIdx].deviceId);
+  };
 
   const handleCapture = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
-
       if (context) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const imageData = canvas.toDataURL('image/jpeg', 0.8);
-        onCapture(imageData);
+        onCapture(canvas.toDataURL('image/jpeg', 0.8));
       }
     }
   };
 
+  const activeLabel = devices.find(d => d.deviceId === activeDeviceId)?.label || 'Buscando...';
+
   return (
-    <div className="relative w-full max-w-md mx-auto overflow-hidden rounded-2xl shadow-xl bg-black aspect-[3/4] md:aspect-video">
+    <div className="relative w-full max-w-md mx-auto overflow-hidden rounded-2xl shadow-2xl bg-black aspect-video border-4 border-white/5">
       {error ? (
-        <div className="flex flex-col items-center justify-center h-full text-white p-4 text-center">
-          <p className="mb-4">{error}</p>
-          <button
-            onClick={startCamera}
-            className="px-4 py-2 bg-blue-600 rounded-full hover:bg-blue-700"
-          >
-            Reintentar
-          </button>
+        <div className="flex flex-col items-center justify-center h-full text-white p-6 text-center">
+          <p className="text-rose-400 font-bold mb-4">{error}</p>
+          <button onClick={() => window.location.reload()} className="px-6 py-2 bg-blue-600 rounded-full">Recargar App</button>
         </div>
       ) : (
         <>
+          {/* Key on video element forces clean remount on device switch */}
           <video
+            key={activeDeviceId}
             ref={videoRef}
             autoPlay
             playsInline
             muted
+            onLoadedMetadata={() => videoRef.current?.play()}
             className="w-full h-full object-cover"
           />
           <canvas ref={canvasRef} className="hidden" />
 
-          {/* Overlay Guide */}
-          <div className="absolute inset-0 border-2 border-white/30 pointer-events-none m-8 rounded-lg flex items-center justify-center">
-            <div className="text-white/50 text-sm font-mono bg-black/50 px-2 rounded">
-              Alinea la Placa Aquí
+          {/* Badge */}
+          <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
+            <div className="bg-black/60 backdrop-blur-xl px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_#10b981]"></div>
+              <span className="text-[11px] text-white font-black uppercase tracking-widest">{activeLabel}</span>
             </div>
+            {devices.length > 1 && (
+              <button onClick={switchCamera} className="p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full border border-white/20 text-white transition-all">
+                <RefreshCw size={20} />
+              </button>
+            )}
           </div>
 
-          {/* Controls */}
-          <div className="absolute bottom-6 left-0 right-0 flex justify-center items-center gap-4">
+          {/* Capture Controls */}
+          <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/90 to-transparent flex flex-col items-center">
             <button
               onClick={handleCapture}
               disabled={isProcessing}
-              className={`p-4 rounded-full border-4 border-white transition-all transform active:scale-95 ${isProcessing
-                ? 'bg-gray-400 cursor-not-allowed'
-                : mode === 'ENTRY'
-                  ? 'bg-blue-600 hover:bg-blue-700 shadow-lg'
-                  : 'bg-orange-600 hover:bg-orange-700 shadow-lg'
+              className={`p-6 rounded-full border-4 border-white transition-all active:scale-90 shadow-2xl ${isProcessing ? 'bg-slate-600' : mode === 'ENTRY' ? 'bg-blue-600 shadow-blue-500/20' : 'bg-orange-600 shadow-orange-500/20'
                 }`}
             >
-              {isProcessing ? (
-                <RefreshCw className="w-8 h-8 text-white animate-spin" />
-              ) : (
-                <Camera className="w-8 h-8 text-white" />
-              )}
+              {isProcessing ? <RefreshCw className="w-8 h-8 animate-spin" /> : <Camera className="w-8 h-8 text-white" />}
             </button>
           </div>
         </>

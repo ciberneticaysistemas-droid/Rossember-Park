@@ -16,37 +16,63 @@ import { RecognitionResult, VehicleType, VehicleDetails } from "../types";
  * ============================================================
  */
 
-/** URL del Cloudflare Worker proxy (nunca contiene la API Key) */
+/** URL del Cloudflare Worker proxy (opcional si se usa API Key directa) */
 const WORKER_URL = import.meta.env.VITE_GEMINI_WORKER_URL as string;
+/** API Key directa (fallback si no hay Worker) */
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string;
 
 /**
- * Llama al Worker proxy con el modelo y contenidos indicados.
+ * Llama al Gemini (vía Worker o Directo) con el modelo y contenidos indicados.
  * Retorna el texto de respuesta de Gemini.
  */
-async function callGeminiProxy(
+async function callGemini(
   model: string,
   contents: unknown[],
   responseMimeType = "application/json"
 ): Promise<string> {
-  if (!WORKER_URL) {
-    throw new Error(
-      "VITE_GEMINI_WORKER_URL no configurada en el archivo .env"
-    );
+  // 1. Intentar vía Worker Proxy si está configurado
+  if (WORKER_URL) {
+    try {
+      const response = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model, contents, config: { responseMimeType } }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.text ?? "";
+      }
+    } catch (e) {
+      console.warn("Fallo al contactar el Worker Proxy, intentando directo...", e);
+    }
   }
 
-  const response = await fetch(WORKER_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, contents, config: { responseMimeType } }),
-  });
+  // 2. Fallback a API Key directa si está configurada
+  if (API_KEY) {
+    // Usar modelo v1.5 flash ya que el v2.5 no existe comercialmente (o usar el solicitado si es compatible)
+    const geminiModel = model.includes("2.5") ? "gemini-1.5-flash" : model;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${API_KEY}`;
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(`Worker error ${response.status}: ${JSON.stringify(err)}`);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents,
+        generationConfig: { responseMimeType }
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(`Gemini API error ${response.status}: ${JSON.stringify(err)}`);
+    }
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
   }
 
-  const data = await response.json();
-  return data.text ?? "";
+  throw new Error("Ni VITE_GEMINI_WORKER_URL ni VITE_GEMINI_API_KEY están configuradas.");
 }
 
 // ─────────────────────────────────────────────
@@ -55,12 +81,12 @@ async function callGeminiProxy(
 export const analyzeImage = async (
   base64Image: string
 ): Promise<RecognitionResult> => {
-  // Verificar que el Worker está configurado
-  if (!WORKER_URL) {
-    console.error("VITE_GEMINI_WORKER_URL no configurada en .env");
+  // Verificar que hay alguna forma de llamar a la IA
+  if (!WORKER_URL && !API_KEY) {
+    console.error("Servicio de IA no configurado en .env");
     alert(
-      "⚠️ El proxy de IA no está configurado.\n" +
-      "Por favor configura VITE_GEMINI_WORKER_URL en el archivo .env y reconstruye."
+      "⚠️ La Inteligencia Artificial no está configurada.\n" +
+      "Por favor configura VITE_GEMINI_API_KEY en el archivo .env."
     );
     return { detected: false, vehicleType: VehicleType.UNKNOWN, plate: "", confidence: 0 };
   }
@@ -71,49 +97,60 @@ export const analyzeImage = async (
     : base64Image;
 
   const prompt = `
-    Actúa como un sistema de control de parqueadero en Colombia. Analiza esta imagen.
-    1. Identifica si hay un vehículo (Carro o Moto).
-    2. Lee la Placa del vehículo. Las placas colombianas son:
-       - Carros: 3 Letras y 3 Números (Ej: AAA123).
-       - Motos: 3 Letras, 2 Números y 1 Letra (Ej: AAA12C).
-    3. Si la imagen es borrosa o no hay placa, retorna placa vacía.
+    INSTRUCCIÓN: Actúa como un experto en visión artificial para control de parqueaderos.
+    TU TAREA: Identificar el vehículo y leer la placa en esta imagen.
     
-    Responde SOLO en formato JSON crudo (sin markdown):
+    CONTEXTO (COLOMBIA):
+    - Carros: 3 letras y 3 números (Ej: ABC123).
+    - Motos: 3 letras, 2 números y 1 letra final (Ej: ABC12D).
+    - Colores: Amarilla (servicio particular), Blanca (servicio público).
+    
+    REGLAS:
+    1. Mira detenidamente el área del bumper o la placa de la moto.
+    2. Si detectas texto que parece placa, extráelo aunque la imagen no sea perfecta.
+    3. Clasifica el tipo de vehículo: "Carro" o "Moto".
+    
+    RESPUESTA JSON:
     {
       "detected": boolean,
       "vehicleType": "Carro" | "Moto" | "Desconocido",
-      "plate": "string (SIN espacios, SIN guiones, MAYÚSCULAS)",
-      "confidence": number (0-1)
+      "plate": "TEXTO_DE_LA_PLACA",
+      "confidence": number (0 a 1)
     }
+    Responde SOLO el JSON crudo.
   `;
 
   try {
-    console.log("Enviando imagen al proxy de Gemini...");
+    console.log("Analizando imagen con Gemini 1.5 Flash...");
 
-    const text = await callGeminiProxy(
-      "gemini-2.5-flash",
+    const text = await callGemini(
+      "gemini-1.5-flash",
       [
-        { inlineData: { mimeType: "image/jpeg", data: base64Data } },
-        { text: prompt },
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType: "image/jpeg", data: base64Data } },
+            { text: prompt },
+          ],
+        },
       ]
     );
 
-    console.log("Respuesta del proxy:", text);
-    if (!text) throw new Error("Respuesta vacía del proxy");
+    console.log("Respuesta Gemini:", text);
+    if (!text) throw new Error("Respuesta de IA vacía.");
 
     const cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const result = JSON.parse(cleanText);
 
-    // Mapeo seguro de tipos de vehículo
     let type = VehicleType.UNKNOWN;
-    const vt = result.vehicleType?.toLowerCase() ?? "";
-    if (vt.includes("car") || vt.includes("carro")) type = VehicleType.CAR;
+    const vt = (result.vehicleType || "").toLowerCase();
+    if (vt.includes("car")) type = VehicleType.CAR;
     if (vt.includes("moto")) type = VehicleType.MOTORCYCLE;
 
     return {
-      detected: result.detected,
+      detected: result.detected && !!result.plate,
       vehicleType: type,
-      plate: result.plate || "",
+      plate: (result.plate || "").toUpperCase().replace(/[^A-Z0-9]/g, ""),
       confidence: result.confidence || 0.8,
     };
   } catch (error) {
@@ -133,8 +170,8 @@ export const analyzeImage = async (
 export const inspectVehicle = async (
   base64Image: string
 ): Promise<VehicleDetails> => {
-  if (!WORKER_URL) {
-    return { make: "Error Proxy", color: "Error", notes: "Falta VITE_GEMINI_WORKER_URL" };
+  if (!WORKER_URL && !API_KEY) {
+    return { make: "Error Config", color: "Error", notes: "Falta API Key o Worker" };
   }
 
   const base64Data = base64Image.includes(",")
@@ -142,20 +179,25 @@ export const inspectVehicle = async (
     : base64Image;
 
   try {
-    const text = await callGeminiProxy(
-      "gemini-2.5-flash",
+    const text = await callGemini(
+      "gemini-1.5-flash",
       [
-        { inlineData: { mimeType: "image/jpeg", data: base64Data } },
         {
-          text: `
-          Analiza visualmente este vehículo para un reporte de auditoría.
-          Retorna un JSON con:
-          {
-            "make": "Marca probable (ej: Mazda, Chevrolet)",
-            "color": "Color principal",
-            "notes": "Descripción breve (ej: Sedán con vidrios polarizados, golpe en bumper, etc)"
-          }
-        `,
+          role: "user",
+          parts: [
+            { inlineData: { mimeType: "image/jpeg", data: base64Data } },
+            {
+              text: `
+              Analiza visualmente este vehículo para un reporte de auditoría.
+              Retorna un JSON con:
+              {
+                "make": "Marca probable (ej: Mazda, Chevrolet)",
+                "color": "Color principal",
+                "notes": "Descripción breve (ej: Sedán con vidrios polarizados, golpe en bumper, etc)"
+              }
+            `,
+            },
+          ],
         },
       ]
     );

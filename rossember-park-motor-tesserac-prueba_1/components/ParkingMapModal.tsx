@@ -305,57 +305,69 @@ export const ParkingMapModal: React.FC<ParkingMapModalProps> = ({
         </div>
 
         {/* Content with Sidebar */}
-        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden bg-[#0F172A]">
 
           {/* Sidebar / Floor Selector */}
-          <div className="w-full md:w-64 bg-slate-100 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col shrink-0 max-h-48 md:max-h-full">
-            <div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
-              <h4 className="font-bold text-gray-700">Pisos</h4>
+          <div className="w-full md:w-72 bg-[#1E293B] border-b md:border-b-0 md:border-r border-slate-700/50 flex flex-col shrink-0 max-h-48 md:max-h-full transition-all">
+            <div className="p-6 border-b border-slate-700/30 bg-[#1E293B]">
+              <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest">Niveles</h4>
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-2">
-              {effectiveFloors.map(floor => (
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+              {effectiveFloors.map((floor, index) => (
                 <div
                   key={floor.id}
-                  className={`p-3 rounded-xl cursor-pointer transition-all border ${selectedFloorId === floor.id ? 'bg-white border-blue-500 shadow-md transform scale-[1.02]' : 'bg-transparent border-transparent hover:bg-gray-200'}`}
+                  className={`group relative p-4 rounded-2xl cursor-pointer transition-all border ${selectedFloorId === floor.id
+                    ? 'bg-blue-600/10 border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.1)]'
+                    : 'bg-slate-800/40 border-transparent hover:bg-slate-800 hover:border-slate-600'
+                    }`}
                   onClick={() => setSelectedFloorId(floor.id)}
                 >
-                  <div className="flex justify-between items-center group">
-                    {editingFloorId === floor.id ? (
-                      <input
-                        type="text"
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        onBlur={saveRenaming}
-                        onKeyDown={(e) => e.key === 'Enter' && saveRenaming()}
-                        className="w-full bg-white border border-blue-300 rounded px-1 text-sm"
-                        autoFocus
-                      />
-                    ) : (
-                      <span className={`font-medium ${selectedFloorId === floor.id ? 'text-blue-700' : 'text-gray-600'}`}>
-                        {floor.name}
-                      </span>
-                    )}
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black transition-colors ${selectedFloorId === floor.id ? 'bg-blue-500 text-white' : 'bg-slate-700 text-slate-400'
+                        }`}>
+                        {index + 1}
+                      </div>
+                      <div className="flex flex-col">
+                        {editingFloorId === floor.id ? (
+                          <input
+                            type="text"
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            onBlur={saveRenaming}
+                            onKeyDown={(e) => e.key === 'Enter' && saveRenaming()}
+                            className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-sm text-white outline-none w-32"
+                            autoFocus
+                          />
+                        ) : (
+                          <>
+                            <span className={`font-bold text-sm ${selectedFloorId === floor.id ? 'text-white' : 'text-slate-300'}`}>
+                              {floor.name}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">
+                              {Object.values(floor.capacities).reduce((a, b) => a + b, 0)} Puestos Totales
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
 
                     {allowEdit && floors.length > 0 && (
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => { e.stopPropagation(); startRenaming(floor); }}
-                          className="p-1 hover:bg-blue-100 rounded text-blue-600"
+                          className="p-1.5 hover:bg-blue-500/20 rounded-lg text-blue-400 transition-colors"
                         >
-                          <Edit2 size={12} />
+                          <Edit2 size={14} />
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleRemoveFloor(floor.id); }}
-                          className="p-1 hover:bg-red-100 rounded text-red-600"
+                          className="p-1.5 hover:bg-red-500/20 rounded-lg text-red-400 transition-colors"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     )}
-                  </div>
-                  {/* Mini Capacity Summary */}
-                  <div className="mt-2 flex gap-2 text-[10px] text-gray-400">
-                    <span>Total: {Object.values(floor.capacities).reduce((a, b) => a + b, 0)}</span>
                   </div>
                 </div>
               ))}
@@ -363,32 +375,53 @@ export const ParkingMapModal: React.FC<ParkingMapModalProps> = ({
               {allowEdit && onFloorsUpdate && (
                 <button
                   onClick={handleAddFloor}
-                  className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center gap-2 text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors"
+                  className="w-full py-4 border-2 border-dashed border-slate-700 rounded-2xl flex items-center justify-center gap-2 text-slate-500 hover:border-blue-500 hover:text-blue-400 hover:bg-blue-500/5 transition-all group"
                 >
-                  <Plus size={16} /> Nuevo Piso
+                  <Plus size={18} className="group-hover:scale-110 transition-transform" />
+                  <span className="font-bold text-sm uppercase tracking-widest">Añadir Nivel</span>
                 </button>
               )}
+            </div>
+
+            {/* Legend Footer in Sidebar */}
+            <div className="p-6 border-t border-slate-700/30 bg-[#1E293B]/50">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-[#7DBA2A]"></div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Disponible</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ocupado</span>
+                </div>
+                {highlightedPlate && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Búsqueda: {highlightedPlate}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Grid Area */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#1E1E2E] space-y-8">
+          <div className="flex-1 overflow-y-auto bg-[#0F172A] relative custom-scrollbar">
 
-            {!hideMapVisual ? (
-              <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-5">
-                  <MapPin size={200} />
-                </div>
-
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-6">
+            <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-8 h-full">
+              {!hideMapVisual ? (
+                <div className="h-full flex flex-col">
+                  <div className="flex items-end justify-between mb-6">
                     <div>
-                      <h2 className="text-3xl font-black text-white tracking-tight">Mapa del Parqueadero</h2>
-                      <p className="text-slate-400 text-sm font-medium">Ubicación en tiempo real - {currentFloor?.name}</p>
+                      <h2 className="text-4xl font-black text-white tracking-tight leading-none mb-2">
+                        Mapa del <span className="text-blue-500">Parqueadero</span>
+                      </h2>
+                      <p className="text-slate-500 text-sm font-bold uppercase tracking-[0.2em]">
+                        Localización en Tiempo Real • {currentFloor?.name}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="bg-slate-900 rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl">
+                  <div className="flex-1 bg-slate-900 rounded-[2.5rem] overflow-hidden border-8 border-slate-800/50 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] relative">
                     <ParkingLayoutMap
                       records={records}
                       highlightedSpot={highlightedPlate}
@@ -396,153 +429,136 @@ export const ParkingMapModal: React.FC<ParkingMapModalProps> = ({
                       showOnlyHighlighted={isPublicView}
                       mapImageUrl={currentFloor?.mapImageUrl}
                       floorId={currentFloor?.id}
+                      floorName={currentFloor?.name}
                       showPlates={!isPublicView}
+                      capacities={currentFloor?.capacities}
+                      prefixes={currentFloor?.prefixes}
                     />
                   </div>
-
-                  <div className="mt-8 flex flex-wrap gap-4 justify-center">
-                    <div className="bg-slate-900/50 px-4 py-2 rounded-xl border border-slate-700/50 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-[#7DBA2A]"></div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase">Libre</span>
-                    </div>
-                    <div className="bg-slate-900/50 px-4 py-2 rounded-xl border border-slate-700/50 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase">Ocupado</span>
-                    </div>
-                    {highlightedPlate && (
-                      <div className="bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/30 flex items-center gap-2 animate-pulse">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></div>
-                        <span className="text-[10px] font-black text-emerald-400 uppercase">Tu Vehículo: {highlightedPlate}</span>
-                      </div>
-                    )}
-                  </div>
                 </div>
-              </div>
-            ) : (
-              /* legacy grid layout when hideMapVisual is true */
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="flex flex-wrap gap-4 mb-8 bg-gray-50 p-3 rounded-xl border border-gray-200 justify-center">
-                  <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
-                    <div className="w-4 h-4 bg-gray-100 border border-gray-200 rounded"></div> Libre
-                  </div>
-                  <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
-                    <div className="w-4 h-4 bg-red-500 rounded"></div> Ocupado
-                  </div>
+              ) : (
+                /* legacy grid layout when hideMapVisual is true */
+                <div className="bg-slate-800/50 p-8 rounded-3xl border border-slate-700 shadow-xl overflow-hidden">
+                  {currentFloor && (
+                    <div className="space-y-10">
+                      {(['REGULAR_CAR', 'PRIORITY_CAR', 'MOTO', 'EV_CHARGING'] as const).map(type => {
+                        const typeLabel = type === 'REGULAR_CAR' ? 'Zona General' :
+                          type === 'PRIORITY_CAR' ? 'Zona Prioritaria' :
+                            type === 'MOTO' ? 'Zona Motos' : 'Zona Carga Eléctrica';
+                        const typeKey = type.split('_')[0] as 'REGULAR' | 'PRIORITY' | 'MOTO' | 'EV';
+                        return (
+                          <div key={type} className="space-y-4">
+                            <h4 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">{typeLabel}</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {renderGrid(currentFloor.prefixes[type], currentFloor.capacities[type], typeKey === 'EV' ? 'EV' : (type.split('_')[0] as any))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
+              )}
 
-                {currentFloor && (
-                  <div className="space-y-6">
-                    {(['REGULAR_CAR', 'PRIORITY_CAR', 'MOTO', 'EV_CHARGING'] as const).map(type => {
-                      const typeLabel = type === 'REGULAR_CAR' ? 'Zona General' :
-                        type === 'PRIORITY_CAR' ? 'Zona Prioritaria' :
-                          type === 'MOTO' ? 'Zona Motos' : 'Zona Carga Eléctrica';
-                      const typeKey = type.split('_')[0] as 'REGULAR' | 'PRIORITY' | 'MOTO' | 'EV';
-                      return (
-                        <div key={type} className="border-t pt-4 first:border-0 first:pt-0">
-                          <h4 className="font-bold text-gray-700 mb-2 truncate">{typeLabel}</h4>
-                          <div className="flex flex-wrap gap-1">
-                            {renderGrid(currentFloor.prefixes[type], currentFloor.capacities[type], typeKey === 'EV' ? 'EV' : (type.split('_')[0] as any))}
+              {/* Legacy Capacity Controls (Visible only if allowEdit) */}
+              {allowEdit && (
+                <div className="bg-slate-800/30 p-8 rounded-3xl border border-slate-700/50 backdrop-blur-md">
+                  <h4 className="text-sm font-black text-white mb-6 uppercase tracking-widest">Configuración de Capacidades - {currentFloor?.name}</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {(['REGULAR_CAR', 'PRIORITY_CAR', 'MOTO', 'EV_CHARGING'] as const).map(type => (
+                      <div key={type} className="p-5 bg-slate-900/50 rounded-2xl border border-slate-700 hover:border-blue-500/50 transition-colors group">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className={`p-2 rounded-lg ${type === 'REGULAR_CAR' ? 'bg-slate-700' :
+                            type === 'PRIORITY_CAR' ? 'bg-blue-500/20 text-blue-400' :
+                              type === 'MOTO' ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'
+                            }`}>
+                            {type === 'REGULAR_CAR' && <Car size={18} />}
+                            {type === 'PRIORITY_CAR' && <Accessibility size={18} />}
+                            {type === 'MOTO' && <Bike size={18} />}
+                            {type === 'EV_CHARGING' && <Zap size={18} />}
+                          </div>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{type.replace('_', ' ')}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <input
+                            type="number"
+                            value={currentFloor?.capacities[type] || 0}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 0;
+                              const currentVal = currentFloor?.capacities[type] || 0;
+                              handleCapacityChange(type, val - currentVal);
+                            }}
+                            className="w-full text-3xl font-black text-white bg-transparent border-b-2 border-slate-700 focus:border-blue-500 outline-none transition-colors"
+                          />
+                          <div className="flex flex-col gap-1">
+                            <button onClick={() => handleCapacityChange(type, 1)} className="p-1 hover:bg-slate-700 rounded-lg text-white transition-colors">
+                              <Plus size={14} />
+                            </button>
+                            <button onClick={() => handleCapacityChange(type, -1)} className="p-1 hover:bg-slate-700 rounded-lg text-white transition-colors">
+                              <LogOut size={14} className="rotate-90" />
+                            </button>
                           </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* Legacy Capacity Controls (Visible only if allowEdit) */}
-            {allowEdit && (
-              <div className="bg-white p-6 rounded-2xl border border-gray-200">
-                <h4 className="font-bold text-gray-800 mb-4">Configuración de Capacidades - {currentFloor?.name}</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {(['REGULAR_CAR', 'PRIORITY_CAR', 'MOTO', 'EV_CHARGING'] as const).map(type => (
-                    <div key={type} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                      <div className="flex items-center gap-2 mb-2">
-                        {type === 'REGULAR_CAR' && <Car size={16} className="text-gray-600" />}
-                        {type === 'PRIORITY_CAR' && <Accessibility size={16} className="text-blue-600" />}
-                        {type === 'MOTO' && <Bike size={16} className="text-orange-600" />}
-                        {type === 'EV_CHARGING' && <Zap size={16} className="text-green-600" />}
-                        <span className="text-xs font-bold text-gray-700 uppercase">{type.replace('_', ' ')}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <input
-                          type="number"
-                          value={currentFloor?.capacities[type] || 0}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 0;
-                            const currentVal = currentFloor?.capacities[type] || 0;
-                            handleCapacityChange(type, val - currentVal);
-                          }}
-                          className="w-full text-2xl font-black text-gray-900 bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
-                        />
-                        <div className="flex flex-col gap-1">
-                          <button onClick={() => handleCapacityChange(type, 1)} className="p-0.5 hover:bg-gray-200 rounded text-xs">+</button>
-                          <button onClick={() => handleCapacityChange(type, -1)} className="p-0.5 hover:bg-gray-200 rounded text-xs">-</button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Detail Popover */}
+      {/* Detail Popover - Modernized */}
       {selectedSpot && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 pointer-events-none">
-          <div className="bg-white p-6 rounded-2xl shadow-2xl border-2 border-slate-900 pointer-events-auto w-72 animate-bounce-in relative">
-            <button
-              onClick={() => setSelectedSpot(null)}
-              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
-            >
-              <X size={16} />
-            </button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-none">
+          <div className="bg-[#1E293B] p-8 rounded-[2rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] border border-slate-700/50 pointer-events-auto w-80 animate-fade-in-up">
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Información del Puesto</span>
+                <h3 className="text-4xl font-black text-white tracking-widest leading-none">
+                  {selectedSpot.spotNumber}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedSpot(null)}
+                className="p-2 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
 
-            <div className="text-center">
-              <div className="text-4xl font-black text-slate-800 mb-1">{selectedSpot.spotNumber}</div>
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Información del Puesto</div>
-
-              <div className="space-y-3 text-left bg-gray-50 p-3 rounded-xl mb-4">
-                <div>
-                  <p className="text-xs text-gray-400">Placa</p>
-                  <p className="font-bold text-lg text-gray-900">{selectedSpot.plate}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">Propietario</p>
-                  <p className="font-medium text-gray-700 text-sm">{selectedSpot.ownerId || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">Entrada</p>
-                  <p className="font-medium text-gray-700 text-sm">
-                    {new Date(selectedSpot.entryTime).toLocaleTimeString()}
-                  </p>
-                </div>
-                {/* Show Floor info in details */}
-                <div>
-                  <p className="text-xs text-gray-400">Ubicación</p>
-                  <p className="font-medium text-gray-700 text-sm">
-                    {currentFloor.name}
-                  </p>
-                </div>
+            <div className="space-y-4 mb-8">
+              <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
+                <p className="text-[10px] font-black text-slate-500 uppercase mb-2">Vehículo Registrado</p>
+                <p className="text-2xl font-black text-white tracking-widest uppercase">{selectedSpot.plate}</p>
               </div>
 
-              {onManualExit && (
-                <button
-                  onClick={() => {
-                    if (window.confirm(`¿Liberar puesto ${selectedSpot.spotNumber} y forzar salida de ${selectedSpot.plate}?`)) {
-                      onManualExit(selectedSpot.id);
-                      setSelectedSpot(null);
-                    }
-                  }}
-                  className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2"
-                >
-                  <LogOut size={16} /> Liberar Puesto
-                </button>
-              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800">
+                  <p className="text-[9px] font-black text-slate-500 uppercase mb-1">Dueño</p>
+                  <p className="font-bold text-slate-200 text-xs">{selectedSpot.ownerId || 'N/A'}</p>
+                </div>
+                <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800">
+                  <p className="text-[9px] font-black text-slate-500 uppercase mb-1">Entrada</p>
+                  <p className="font-bold text-slate-200 text-xs">{new Date(selectedSpot.entryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                </div>
+              </div>
             </div>
+
+            {onManualExit && (
+              <button
+                onClick={() => {
+                  if (window.confirm(`¿Liberar puesto ${selectedSpot.spotNumber} y forzar salida de ${selectedSpot.plate}?`)) {
+                    onManualExit(selectedSpot.id);
+                    setSelectedSpot(null);
+                  }
+                }}
+                className="w-full py-4 bg-red-500 hover:bg-red-400 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all shadow-lg shadow-red-500/20 active:scale-95 flex items-center justify-center gap-2"
+              >
+                <LogOut size={16} /> Liberar Puesto
+              </button>
+            )}
           </div>
         </div>
       )}
