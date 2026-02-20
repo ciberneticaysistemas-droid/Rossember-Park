@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { DeviceSelector } from './components/DeviceSelector';
 import { EntryView } from './views/EntryView';
 import { ExitView } from './views/ExitView';
@@ -46,10 +46,11 @@ const DEFAULT_RATES = {
   'GRACE_PERIOD_MINUTES': 15
 };
 
-// Admin credentials (in production, this should be in a secure backend)
+// Admin credentials - leídas desde variables de entorno (.env)
+// En GitHub Pages, configura estos valores como GitHub Secrets en el workflow de Actions
 const ADMIN_CREDENTIALS = {
-  username: 'admin',
-  password: 'admin123'
+  username: import.meta.env.VITE_ADMIN_USERNAME || 'admin',
+  password: import.meta.env.VITE_ADMIN_PASSWORD || 'admin123'
 };
 
 const AppContent: React.FC = () => {
@@ -513,9 +514,10 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <BrowserRouter>
+    // HashRouter es necesario para GitHub Pages (rutas como /#/admin funcionan sin servidor)
+    <HashRouter>
       <AppContent />
-    </BrowserRouter>
+    </HashRouter>
   );
 };
 
