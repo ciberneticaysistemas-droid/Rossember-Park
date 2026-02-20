@@ -430,6 +430,7 @@ const AppContent: React.FC = () => {
           onCancelEntry={handleCancelEntry}
           clientLogo={clientLogo}
           specialRates={specialRates}
+          floors={floors}
         />
       } />
 

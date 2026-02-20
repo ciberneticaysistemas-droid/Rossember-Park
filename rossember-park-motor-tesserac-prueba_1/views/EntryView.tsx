@@ -4,7 +4,7 @@ import { VehicleCard } from '../components/VehicleCard';
 import { VirtualKeyboard } from '../components/VirtualKeyboard';
 import { AdDisplay } from '../components/AdDisplay';
 import { analyzeImage } from '../services/geminiService';
-import { ParkingRecord, VehicleType, SpecialRate, SpecialRateType } from '../types';
+import { ParkingRecord, VehicleType, SpecialRate, SpecialRateType, Floor } from '../types';
 import { useVoice } from '../hooks/useVoice';
 import { Car, Bike, LogIn, Activity, AlertCircle, User, Keyboard, Camera as CameraIcon, Accessibility, Zap, MapPin, ArrowLeft, CheckCircle, ShieldAlert, Calendar } from 'lucide-react';
 import { ParkingLayoutMap } from '../components/ParkingLayoutMap';
@@ -19,6 +19,7 @@ interface EntryViewProps {
     onCancelEntry: (recordId: string) => void;
     clientLogo?: string | null;
     specialRates: SpecialRate[];
+    floors?: Floor[];
 }
 
 export const EntryView: React.FC<EntryViewProps> = ({
@@ -30,7 +31,8 @@ export const EntryView: React.FC<EntryViewProps> = ({
     onBackToSelector,
     onCancelEntry,
     clientLogo,
-    specialRates
+    specialRates,
+    floors
 }) => {
     const { speak } = useVoice();
     const [isProcessing, setIsProcessing] = useState(false);
@@ -502,7 +504,21 @@ export const EntryView: React.FC<EntryViewProps> = ({
 
                                         {/* Map Visualization */}
                                         <div className="mb-4">
-                                            <ParkingLayoutMap highlightedSpot={lastProcessed.spotNumber} isEntryAssignment records={records} />
+                                            {(() => {
+                                                const record = records.find(r => r.id === lastProcessed.recordId);
+                                                const floor = floors?.find(f => f.id === record?.floorId);
+                                                return (
+                                                    <ParkingLayoutMap
+                                                        highlightedSpot={lastProcessed.spotNumber}
+                                                        isEntryAssignment
+                                                        records={records}
+                                                        floorId={floor?.id}
+                                                        floorName={floor?.name}
+                                                        capacities={floor?.capacities}
+                                                        prefixes={floor?.prefixes}
+                                                    />
+                                                );
+                                            })()}
                                         </div>
 
                                         {/* Spot Assignment */}

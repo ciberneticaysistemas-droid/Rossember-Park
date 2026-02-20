@@ -301,6 +301,18 @@ export const AdminView: React.FC<AdminViewProps> = ({
                                             records={records}
                                             interactive={true}
                                             floorId={selectedDashboardFloorId}
+                                            floorName={(() => {
+                                                const f = (floors && floors.length > 0 ? floors : [{ id: 'default', name: 'Piso 1' }]).find(f => f.id === selectedDashboardFloorId);
+                                                return f?.name;
+                                            })()}
+                                            capacities={(() => {
+                                                const f = (floors && floors.length > 0 ? floors : [{ id: 'default', capacities }]).find(f => f.id === selectedDashboardFloorId);
+                                                return f?.capacities;
+                                            })()}
+                                            prefixes={(() => {
+                                                const f = (floors && floors.length > 0 ? floors : [{ id: 'default', prefixes: { REGULAR_CAR: 'C', PRIORITY_CAR: 'P', MOTO: 'M', EV_CHARGING: 'E' } }]).find(f => f.id === selectedDashboardFloorId);
+                                                return f?.prefixes;
+                                            })()}
                                             mapImageUrl={(floors && floors.length > 0 ? floors : []).find(f => f.id === selectedDashboardFloorId)?.mapImageUrl}
                                             showPlates={true}
                                         />
