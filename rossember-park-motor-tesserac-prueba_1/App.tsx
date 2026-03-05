@@ -155,34 +155,46 @@ const AppContent: React.FC = () => {
     const activeRecords = records.filter(r => r.status === 'ACTIVE');
     const usedSpots = new Set(activeRecords.map(r => r.spotNumber));
 
+    console.log(`[getAvailableSpot] Buscando para: ${type}, Prioridad: ${isPriority}, Carga: ${requiresCharging}`);
+    console.log(`[getAvailableSpot] Puestos ocupados actualmente:`, Array.from(usedSpots));
+
     for (const floor of floors) {
       const isLegacyFloor = floor.id === 'floor-1';
       const prefixSuffix = isLegacyFloor ? '' : `${floor.name.replace(/\s/g, '')}-`;
+      const floorPrefixes = floor.prefixes || DEFAULT_PREFIXES;
+      const floorCaps = floor.capacities || DEFAULT_CAPACITIES;
+
+      console.log(`[getAvailableSpot] Revisando ${floor.name} (${floor.id}). Prefijo: ${prefixSuffix}. Caps:`, floorCaps);
 
       if (requiresCharging) {
-        for (let i = 1; i <= floor.capacities.EV_CHARGING; i++) {
-          const spot = `${prefixSuffix}${floor.prefixes.EV_CHARGING}-${i.toString().padStart(3, '0')}`;
+        for (let i = 1; i <= floorCaps.EV_CHARGING; i++) {
+          const spot = `${prefixSuffix}${floorPrefixes.EV_CHARGING}-${i.toString().padStart(3, '0')}`;
           if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
         }
       } else if (type === VehicleType.MOTORCYCLE) {
-        for (let i = 1; i <= floor.capacities.MOTO; i++) {
-          const spot = `${prefixSuffix}${floor.prefixes.MOTO}-${i.toString().padStart(3, '0')}`;
+        for (let i = 1; i <= floorCaps.MOTO; i++) {
+          const spot = `${prefixSuffix}${floorPrefixes.MOTO}-${i.toString().padStart(3, '0')}`;
           if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
         }
       } else {
         if (isPriority) {
-          for (let i = 1; i <= floor.capacities.PRIORITY_CAR; i++) {
-            const spot = `${prefixSuffix}${floor.prefixes.PRIORITY_CAR}-${i.toString().padStart(3, '0')}`;
+          // Check Priority Spots
+          for (let i = 1; i <= floorCaps.PRIORITY_CAR; i++) {
+            const spot = `${prefixSuffix}${floorPrefixes.PRIORITY_CAR}-${i.toString().padStart(3, '0')}`;
             if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
           }
-        } else {
-          for (let i = 1; i <= floor.capacities.REGULAR_CAR; i++) {
-            const spot = `${prefixSuffix}${floor.prefixes.REGULAR_CAR}-${i.toString().padStart(3, '0')}`;
-            if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
-          }
+          // Fallback to Regular if Priority is full (Optional, but useful for user experience)
+          // Actually let's keep it strict or the user might be confused why they were given C-001
+        }
+
+        // Check Regular Spots
+        for (let i = 1; i <= floorCaps.REGULAR_CAR; i++) {
+          const spot = `${prefixSuffix}${floorPrefixes.REGULAR_CAR}-${i.toString().padStart(3, '0')}`;
+          if (!usedSpots.has(spot)) return { spot, floorId: floor.id };
         }
       }
     }
+    console.warn(`[getAvailableSpot] NO SE ENCONTRÓ PUESTO DISPONIBLE`);
     return null;
   };
 
@@ -250,17 +262,15 @@ const AppContent: React.FC = () => {
     imageData: string | null,
     isAccessibility: boolean,
     requiresCharging: boolean = false
-  ): ParkingRecord | null => {
+  ): { record: ParkingRecord | null, error?: string } => {
     const existing = records.find(r => r.plate === plate && r.status === 'ACTIVE');
     if (existing) {
-      console.error(`Vehicle ${plate} already in parking`);
-      return null;
+      return { record: null, error: `El vehículo con placa ${plate} ya se encuentra activo en el parqueadero.` };
     }
 
     const assignment = getAvailableSpot(vehicleType, isAccessibility, requiresCharging);
     if (!assignment) {
-      console.error('No available spots');
-      return null;
+      return { record: null, error: `No hay plazas disponibles para ${vehicleType}${requiresCharging ? ' con carga' : ''}.` };
     }
 
     const newRecord: ParkingRecord = {
@@ -279,7 +289,7 @@ const AppContent: React.FC = () => {
 
     setRecords(prev => [newRecord, ...prev]);
     setAdTrigger(prev => prev + 1);
-    return newRecord;
+    return { record: newRecord };
   };
 
   const handleCancelEntry = (recordId: string) => {

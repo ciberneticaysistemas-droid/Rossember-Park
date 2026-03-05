@@ -14,7 +14,7 @@ interface EntryViewProps {
     capacities: { REGULAR_CAR: number; PRIORITY_CAR: number; MOTO: number; EV_CHARGING: number };
     advertisements: string[];
     adTrigger?: number;
-    onProcessEntry: (plate: string, vehicleType: VehicleType, ownerId: string, imageData: string | null, isAccessibility: boolean, requiresCharging?: boolean) => ParkingRecord | null;
+    onProcessEntry: (plate: string, vehicleType: VehicleType, ownerId: string, imageData: string | null, isAccessibility: boolean, requiresCharging?: boolean) => { record: ParkingRecord | null, error?: string };
     onBackToSelector: () => void;
     onCancelEntry: (recordId: string) => void;
     clientLogo?: string | null;
@@ -118,14 +118,9 @@ export const EntryView: React.FC<EntryViewProps> = ({
                     speak("Vehículo procesado. Bienvenido.");
                 }
 
-                const resultRecord = onProcessEntry(result.plate, vType, ownerIdInput.trim(), imageData, isAccessibilityMode, requiresCharging);
+                const { record: resultRecord, error: processError } = onProcessEntry(result.plate, vType, ownerIdInput.trim(), imageData, isAccessibilityMode, requiresCharging);
 
                 if (resultRecord) {
-                    const floor = resultRecord.floorId;
-                    // This is a bit tricky since EntryView doesn't have the floors array, 
-                    // but we can infer it or just use the prefix from spotNumber.
-                    // For now, let's just use the spotNumber which includes the floor prefix if not legacy.
-
                     const spotStr = resultRecord.spotNumber || 'Asignado';
                     speak(`Bienvenido a Rossember Parking. Puesto asignado: ${spotStr}`);
 
@@ -149,8 +144,8 @@ export const EntryView: React.FC<EntryViewProps> = ({
                     setOwnerIdInput('');
                     setActiveInput(null);
                 } else {
-                    setErrorMsg("⚠️ No hay plazas disponibles para este tipo de vehículo o el vehículo ya se encuentra en el parqueadero.");
-                    speak("Lo sentimos, no hay plazas disponibles para este tipo de vehículo.");
+                    setErrorMsg(processError || "⚠️ No hay plazas disponibles para este tipo de vehículo.");
+                    speak(processError || "Lo sentimos, no hay plazas disponibles.");
                 }
             } else {
                 setErrorMsg("La IA de Gemini no detectó una placa clara. Intenta nuevamente o usa el ingreso manual.");
@@ -201,7 +196,7 @@ export const EntryView: React.FC<EntryViewProps> = ({
             const finalType = (requiresCharging && manualType === VehicleType.CAR) ? VehicleType.ELECTRIC : manualType;
 
             const specialRate = specialRates.find(r => r.plate === manualPlate.toUpperCase() && r.isActive);
-            const resultRecord = onProcessEntry(manualPlate.toUpperCase(), finalType, ownerIdInput.trim(), null, isAccessibilityMode, requiresCharging);
+            const { record: resultRecord, error: processError } = onProcessEntry(manualPlate.toUpperCase(), finalType, ownerIdInput.trim(), null, isAccessibilityMode, requiresCharging);
 
             if (resultRecord) {
                 const spotStr = resultRecord.spotNumber || 'Asignado';
@@ -237,8 +232,8 @@ export const EntryView: React.FC<EntryViewProps> = ({
                 setRequiresCharging(false);
                 setActiveInput(null);
             } else {
-                setErrorMsg("⚠️ No hay plazas disponibles o el vehículo ya está registrado.");
-                speak("Lo sentimos, no hay plazas disponibles para este tipo de vehículo.");
+                setErrorMsg(processError || "⚠️ No hay plazas disponibles o el vehículo ya está registrado.");
+                speak(processError || "Lo sentimos, no hay plazas disponibles.");
             }
             setIsProcessing(false);
         }, 500);

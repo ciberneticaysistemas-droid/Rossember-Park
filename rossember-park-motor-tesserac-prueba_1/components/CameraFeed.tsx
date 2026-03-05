@@ -31,12 +31,12 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onCapture, isProcessing,
         stream.getTracks().forEach(t => t.stop());
       }
 
-      // Request HD resolution for better license plate detection
+      // Higher resolution ideal for license plates, but flexible to avoid errors
       const constraints = {
         video: {
           deviceId: { exact: deviceId },
-          width: { ideal: 1920, min: 1280 },
-          height: { ideal: 1080, min: 720 }
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
         },
         audio: false
       };
